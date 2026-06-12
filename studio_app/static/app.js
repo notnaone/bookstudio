@@ -197,11 +197,11 @@ async function setupBookPage() {
       const r = await jsonFetch(`/api/books/${id}/rescan_audio`, { method: 'POST' });
       status.textContent = `${r.audio_files} file(s).`;
       const refreshed = await jsonFetch(`/api/books/${id}`);
-      const s = refreshed.stats;
-      document.getElementById('h_recorded').textContent = fmtHours(s.total_audio_seconds);
-      document.getElementById('chars_per_hour').textContent = fmtRound(s.chars_per_hour);
-      document.getElementById('pages_per_hour').textContent = fmtRound(s.pages_per_hour);
-      document.getElementById('progress_pct').textContent = fmtPct(s.progress_pct);
+      const s = refreshed.stats || {};
+      document.getElementById('h_recorded').textContent = fmtHours(s.total_audio_seconds || 0);
+      document.getElementById('chars_per_hour').textContent = fmtRound(s.chars_per_hour || 0);
+      document.getElementById('pages_per_hour').textContent = fmtRound(s.pages_per_hour || 0);
+      document.getElementById('progress_pct').textContent = fmtPct(s.progress_pct || 0);
     } catch (e) { status.textContent = e.message; }
   });
 
