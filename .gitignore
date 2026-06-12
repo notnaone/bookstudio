@@ -1,0 +1,46 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+BookAnalyzer.spec
+
+# Build/test artifacts
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App-local data (user-specific; not source)
+studio_app.zip
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Local design handoff scratch
+design_handoff_book_analyzer_redesign/
