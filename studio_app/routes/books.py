@@ -38,11 +38,31 @@ def _book_row_to_dict(row) -> dict:
 
 
 @router.get("/api/books")
-def list_books(request: Request) -> dict:
+def list_books(
+    request: Request,
+    status: str | None = None,
+    narrator_id: int | None = None,
+    publisher_id: int | None = None,
+    q: str | None = None,
+) -> dict:
     conn = request.app.state.conn
-    rows = conn.execute(
-        "SELECT * FROM book ORDER BY updated_at DESC"
-    ).fetchall()
+    clauses: list[str] = []
+    params: list = []
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+    if narrator_id is not None:
+        clauses.append("narrator_id = ?")
+        params.append(narrator_id)
+    if publisher_id is not None:
+        clauses.append("publisher_id = ?")
+        params.append(publisher_id)
+    if q:
+        clauses.append("title LIKE ?")
+        params.append(f"%{q}%")
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    sql = f"SELECT * FROM book {where} ORDER BY updated_at DESC"
+    rows = conn.execute(sql, params).fetchall()
     return {"books": [_book_row_to_dict(r) for r in rows]}
 
 

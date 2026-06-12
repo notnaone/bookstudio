@@ -161,3 +161,32 @@ async def test_patch_book_clear_draft_requires_publisher_and_genre(client, tmp_p
     assert r.status_code == 400
     detail = r.json()["detail"].lower()
     assert "publisher" in detail or "genre" in detail
+
+
+async def test_list_books_filters_by_status(client, tmp_path: Path):
+    b1 = await _create_test_book(client, tmp_path, title="Planned One")
+    b2 = await _create_test_book(client, tmp_path, title="In Progress One")
+    await client.patch(f"/api/books/{b2}", json={"status": "in_progress"})
+
+    r = await client.get("/api/books?status=in_progress")
+    titles = [b["title"] for b in r.json()["books"]]
+    assert titles == ["In Progress One"]
+
+
+async def test_list_books_filters_by_title_substring(client, tmp_path: Path):
+    await _create_test_book(client, tmp_path, title="Alpha Book")
+    await _create_test_book(client, tmp_path, title="Beta Book")
+    r = await client.get("/api/books?q=alpha")
+    titles = [b["title"] for b in r.json()["books"]]
+    assert titles == ["Alpha Book"]
+
+
+async def test_list_books_filters_by_narrator(client, tmp_path: Path):
+    n = await client.post("/api/narrators", json={"name": "Filter Narr"})
+    nid = n.json()["id"]
+    b1 = await _create_test_book(client, tmp_path, title="Assigned")
+    b2 = await _create_test_book(client, tmp_path, title="Unassigned")
+    await client.patch(f"/api/books/{b1}", json={"narrator_id": nid})
+    r = await client.get(f"/api/books?narrator_id={nid}")
+    titles = [b["title"] for b in r.json()["books"]]
+    assert titles == ["Assigned"]
