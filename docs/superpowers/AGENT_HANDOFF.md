@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1 + 2 are shipped; Phase 3 is in progress on `phase-3-audio-scanner`. Your job is to continue the same workflow, dispatching Composer subagents per task and auditing their work.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–3 are shipped on `master`. Phase 4 (Live Viewer) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
 
 ---
 
@@ -38,7 +38,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
     │   ├── 2026-06-12-studio-app-roadmap.md           # 7-phase overview
     │   ├── 2026-06-12-phase-1-foundation.md           # ✅ shipped
     │   ├── 2026-06-12-phase-2-library-screens.md      # ✅ shipped
-    │   ├── 2026-06-12-phase-3-audio-scanner.md        # ← NEXT
+    │   ├── 2026-06-12-phase-3-audio-scanner.md        # ✅ shipped
+    │   ├── 2026-06-12-phase-4-live-viewer.md          # ← NEXT (write just-in-time)
     │   └── (phases 4-7 to be written just-in-time per phase)
     └── progress/                                       # per-phase execution ledgers
 ```
@@ -59,8 +60,8 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       last commit: 6a368c5 (hardening(p2): FK violation on PATCH → 400)
-phase-3-audio-scanner        current branch, contains the Phase 3 plan doc
+master                       Phases 1–3 merged; 100 tests
+phase-4-live-viewer          branch to create for Phase 4
 ```
 
 Each phase = its own branch off `master`, merged with `--no-ff` after audit passes. Per-task commits land on the phase branch. Branch naming: `phase-N-<short-name>`.
