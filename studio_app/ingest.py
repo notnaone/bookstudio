@@ -79,22 +79,26 @@ def ingest_book(
 
     view_path = str(dest)
 
-    cur = conn.execute(
-        """
-        INSERT INTO book (
-            slug, title, publisher_id, source_path, view_path, format,
-            body_chars, raw_chars, chars_per_page, pages,
-            images, charts_tables,
-            audio_folder, is_draft, current_page, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'planned')
-        """,
-        (
-            slug, title, publisher_id,
-            str(dest), view_path, parsed.format,
-            parsed.body_chars, parsed.raw_chars,
-            parsed.chars_per_page, parsed.total_pages or 0,
-            parsed.total_images, parsed.total_tables + parsed.total_charts,
-            audio_folder, 1 if is_draft else 0,
-        ),
-    )
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO book (
+                slug, title, publisher_id, source_path, view_path, format,
+                body_chars, raw_chars, chars_per_page, pages,
+                images, charts_tables,
+                audio_folder, is_draft, current_page, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'planned')
+            """,
+            (
+                slug, title, publisher_id,
+                str(dest), view_path, parsed.format,
+                parsed.body_chars, parsed.raw_chars,
+                parsed.chars_per_page, parsed.total_pages or 0,
+                parsed.total_images, parsed.total_tables + parsed.total_charts,
+                audio_folder, 1 if is_draft else 0,
+            ),
+        )
+    except Exception:
+        shutil.rmtree(book_dir, ignore_errors=True)
+        raise
     return int(cur.lastrowid)

@@ -81,3 +81,19 @@ async def test_post_book_preserves_original_filename(client, tmp_path: Path):
     src_path = r.json()["source_path"]
     assert src_path.endswith("Publisher Sent This.txt"), src_path
     assert "internal_tmp_path" not in src_path
+
+
+async def test_post_book_large_payload_streamed(client, tmp_path: Path):
+    """Upload ~1 MB TXT to exercise the chunked read loop (>1 KB chunks)."""
+    big = tmp_path / "big.txt"
+    big.write_text("paragraph " * 100_000, encoding="utf-8")  # ~1 MB
+    with big.open("rb") as fh:
+        r = await client.post(
+            "/api/books",
+            files={"file": ("BigBook.txt", fh, "text/plain")},
+            data={"title": "Big Upload"},
+        )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    # parser counts non-whitespace chars; "paragraph" is 9 chars, x 100k = 900k
+    assert body["body_chars"] > 500_000

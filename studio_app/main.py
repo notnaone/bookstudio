@@ -6,7 +6,7 @@ import webbrowser
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -35,8 +35,10 @@ def build_app(
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
-    def root() -> RedirectResponse:
-        row = conn.execute("SELECT value FROM app_setting WHERE key='data_root'").fetchone()
+    def root(request: Request) -> RedirectResponse:
+        row = request.app.state.conn.execute(
+            "SELECT value FROM app_setting WHERE key='data_root'"
+        ).fetchone()
         if row and row["value"]:
             return RedirectResponse(url="/library")
         return RedirectResponse(url="/setup")

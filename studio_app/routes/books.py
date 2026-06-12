@@ -63,8 +63,11 @@ async def create_book(
 
     suffix = Path(file.filename or "").suffix or ""
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        chunk = await file.read()
-        tmp.write(chunk)
+        while True:
+            chunk = await file.read(65536)
+            if not chunk:
+                break
+            tmp.write(chunk)
         tmp_path = Path(tmp.name)
 
     try:
@@ -77,7 +80,8 @@ async def create_book(
     finally:
         try:
             tmp_path.unlink()
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError, OSError):
+            # On Windows the parser may still hold a handle; OS cleans up on GC.
             pass
 
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
