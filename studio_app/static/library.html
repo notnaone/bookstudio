@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Library — Studio App</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head><body>
+<header>
+  <strong>Studio App</strong>
+  <a class="active" href="/library">Library</a>
+  <a href="#" onclick="return false">Schedule</a>
+</header>
+<main>
+  <h1>Library</h1>
+  <form id="upload-form" class="row" enctype="multipart/form-data">
+    <input id="title" name="title" placeholder="Book title" required>
+    <input id="file" name="file" type="file" accept=".pdf,.epub,.docx,.txt" required>
+    <button class="primary" type="submit">Add book</button>
+    <span id="upload-status" class="muted"></span>
+  </form>
+  <table id="books-table">
+    <thead><tr>
+      <th>Title</th><th>Format</th><th>Pages</th><th>Body chars</th><th>Status</th>
+    </tr></thead>
+    <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+  </table>
+</main>
+<script src="/static/app.js"></script>
+<script>setupLibraryPage();</script>
+</body></html>
