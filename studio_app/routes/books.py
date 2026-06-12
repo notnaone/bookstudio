@@ -247,6 +247,29 @@ async def patch_book(book_id: int, request: Request) -> dict:
     return _book_row_to_dict(row)
 
 
+@router.patch("/api/books/{book_id}/active_page")
+async def patch_active_page(book_id: int, request: Request) -> dict:
+    conn = request.app.state.conn
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Book not found")
+    payload = await request.json()
+    if not isinstance(payload, dict) or "tracked_progress_page" not in payload:
+        raise HTTPException(400, "tracked_progress_page required")
+    page = int(payload["tracked_progress_page"])
+    if page < 1:
+        raise HTTPException(400, "tracked_progress_page must be >= 1")
+    if row["pages"] and page > int(row["pages"]):
+        raise HTTPException(400, "tracked_progress_page exceeds book.pages")
+    with hold(request.app.state.db_lock):
+        conn.execute(
+            "UPDATE book SET current_page = ? WHERE id = ?",
+            (page, book_id),
+        )
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    return _book_row_to_dict(row)
+
+
 @router.post("/api/books/{book_id}/rescan_audio")
 def rescan_audio(book_id: int, request: Request) -> dict:
     from studio_app.audio_scanner import recompute_stats, scan_book

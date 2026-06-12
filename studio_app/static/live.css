@@ -1,0 +1,146 @@
+header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #ccc;
+}
+
+#panes {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+.pane {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pane.focused {
+  border: 2px solid #4a9;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+.pane-title {
+  font-weight: 600;
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.marks-rail {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  width: 180px;
+  border-right: 1px solid #eee;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.marks-rail li {
+  padding: 4px 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.marks-rail li:hover {
+  background: #f5f5f5;
+}
+
+.marks-rail li.flash {
+  background: #e8f5ef;
+}
+
+.marks-rail .muted {
+  color: #888;
+  cursor: default;
+}
+
+.mark-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.viewer-host {
+  flex: 1;
+  min-height: 70vh;
+  position: relative;
+  overflow: auto;
+  background: #fafafa;
+}
+
+.mark-overlay {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.45;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+
+.mark-drag-preview {
+  position: absolute;
+  border: 2px dashed #4a9;
+  background: rgba(68, 170, 153, 0.15);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.page-frame {
+  aspect-ratio: 8.5 / 11;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  margin: 0 auto;
+}
+
+.pace-badge {
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pane-status {
+  font-size: 12px;
+  color: #a44;
+}
+
+.session-timer,
+.viewer-page,
+.active-page .page-counter {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pane-close {
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.muted {
+  color: #888;
+}

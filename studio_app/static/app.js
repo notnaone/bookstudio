@@ -175,6 +175,12 @@ async function setupBookPage() {
 
   document.getElementById('title').textContent = b.title;
   document.getElementById('meta').textContent = `Slug: ${b.slug}`;
+  document.getElementById('open-viewer').addEventListener('click', () => {
+    if (b.is_draft && !confirm('This book is an incomplete draft. Open in viewer anyway?')) {
+      return;
+    }
+    location.href = `/live/${id}`;
+  });
   document.getElementById('format').textContent = b.format;
   document.getElementById('pages').textContent = b.pages || '—';
   document.getElementById('body_chars').textContent = b.body_chars.toLocaleString();

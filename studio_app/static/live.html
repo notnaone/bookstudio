@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Live — Studio App</title>
+<link rel="stylesheet" href="/static/live.css">
+</head><body>
+<header>
+  <strong>Studio App — Live</strong>
+</header>
+<div id="panes">
+  <div class="pane focused" data-template="1">
+    <div class="top-bar">
+      <span class="pane-title"></span>
+      <input type="search" class="search-input" placeholder="Search marks…" aria-label="Search marks">
+      <span class="viewer-page"></span>
+      <span class="active-page">
+        <button type="button" class="page-dec" aria-label="Previous page">−</button>
+        <span class="page-counter"></span>
+        <button type="button" class="page-inc" aria-label="Next page">+</button>
+      </span>
+      <span class="pace-badge" title="Click to change pace unit"></span>
+      <span class="session-timer"></span>
+      <span class="pane-status"></span>
+      <button type="button" class="pane-close" aria-label="Close pane">×</button>
+    </div>
+    <div class="layout">
+      <ul class="marks-rail"></ul>
+      <div class="viewer-host"></div>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+<script src="/static/live.js"></script>
+<script>initLive();</script>
+</body></html>

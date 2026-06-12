@@ -18,6 +18,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "jinja2>=3.1.4",
     "python-multipart>=0.0.32",
+    "mammoth>=1.8.0",
 ]
 
 [project.scripts]

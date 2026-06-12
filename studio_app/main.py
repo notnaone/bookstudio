@@ -15,7 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from studio_app.db import connect, migrate
 from studio_app.db_lock import hold
 from studio_app.routes import books as books_routes
+from studio_app import viewer_routes
+from studio_app.routes import marks as marks_routes
 from studio_app.routes import narrators as narrators_routes
+from studio_app.routes import sessions as sessions_routes
 from studio_app.routes import publishers as publishers_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
@@ -28,9 +31,14 @@ DEFAULT_LOCAL_STATE_DIR = Path.home() / "AppData" / "Roaming" / "StudioApp"
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     scanner = getattr(app.state, "scanner", None)
+    reaper = getattr(app.state, "reaper", None)
     if scanner is not None:
         scanner.start()
+    if reaper is not None:
+        reaper.start()
     yield
+    if reaper is not None:
+        reaper.stop()
     if scanner is not None:
         scanner.stop()
 
@@ -41,6 +49,7 @@ def build_app(
     data_root: Path,
     local_state_dir: Path,
     scanner=None,
+    reaper=None,
     db_lock: threading.Lock | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Studio App", lifespan=_lifespan)
@@ -50,6 +59,9 @@ def build_app(
     app.state.db_lock = db_lock if db_lock is not None else threading.Lock()
     app.include_router(system_routes.router)
     app.include_router(books_routes.router)
+    app.include_router(marks_routes.router)
+    app.include_router(sessions_routes.router)
+    app.include_router(viewer_routes.router)
     app.include_router(settings_routes.router)
     app.include_router(publishers_routes.router)
     app.include_router(narrators_routes.router)
@@ -80,7 +92,16 @@ def build_app(
     def narrator_page(nid: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "narrator.html")
 
+    @app.get("/live/{book_id}", include_in_schema=False)
+    def live_single(book_id: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "live.html")
+
+    @app.get("/live/{a}/{b}", include_in_schema=False)
+    def live_split(a: int, b: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "live.html")
+
     app.state.scanner = scanner
+    app.state.reaper = reaper
     return app
 
 
@@ -102,21 +123,36 @@ def main() -> int:
 
     from studio_app.audio_scanner import scan_all
     from studio_app.background import AudioScanner
+    from studio_app.reaper import SessionReaper, reap_stale_sessions
 
     db_lock = threading.Lock()
     settings = load_settings(conn)
-    interval = settings.audio_scan_interval_seconds
 
     def locked_scan_all(c: sqlite3.Connection) -> int:
         with hold(db_lock):
             return scan_all(c)
 
-    scanner = AudioScanner(conn, interval_seconds=interval, scan_fn=locked_scan_all)
+    def locked_reap(c: sqlite3.Connection) -> None:
+        with hold(db_lock):
+            reap_stale_sessions(c, settings.session_idle_timeout_seconds)
+
+    scanner = AudioScanner(
+        conn,
+        interval_seconds=settings.audio_scan_interval_seconds,
+        scan_fn=locked_scan_all,
+    )
+    reaper = SessionReaper(
+        conn,
+        idle_timeout_seconds=settings.session_idle_timeout_seconds,
+        interval_seconds=settings.reaper_interval_seconds,
+        reap_fn=locked_reap,
+    )
     app = build_app(
         conn=conn,
         data_root=data_root,
         local_state_dir=local_state_dir,
         scanner=scanner,
+        reaper=reaper,
         db_lock=db_lock,
     )
     url = "http://127.0.0.1:8765"
