@@ -39,6 +39,25 @@ def _book_row_to_dict(row) -> dict:
     }
 
 
+def _stats_for_book(conn, book_id: int) -> dict:
+    row = conn.execute(
+        "SELECT * FROM book_stats WHERE book_id = ?", (book_id,)
+    ).fetchone()
+    if row is None:
+        return {
+            "total_audio_seconds": 0,
+            "chars_per_hour": 0,
+            "pages_per_hour": 0,
+            "progress_pct": 0,
+        }
+    return {
+        "total_audio_seconds": row["total_audio_seconds"],
+        "chars_per_hour": row["chars_per_hour"],
+        "pages_per_hour": row["pages_per_hour"],
+        "progress_pct": row["progress_pct"],
+    }
+
+
 @router.get("/api/books")
 def list_books(
     request: Request,
@@ -74,7 +93,9 @@ def get_book(book_id: int, request: Request) -> dict:
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Book not found")
-    return _book_row_to_dict(row)
+    body = _book_row_to_dict(row)
+    body["stats"] = _stats_for_book(conn, book_id)
+    return body
 
 
 @router.post("/api/books", status_code=201)
@@ -191,3 +212,15 @@ async def patch_book(book_id: int, request: Request) -> dict:
     conn.execute("RELEASE SAVEPOINT patch_book")
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     return _book_row_to_dict(row)
+
+
+@router.post("/api/books/{book_id}/rescan_audio")
+def rescan_audio(book_id: int, request: Request) -> dict:
+    from studio_app.audio_scanner import scan_book, recompute_stats
+    conn = request.app.state.conn
+    row = conn.execute("SELECT id FROM book WHERE id = ?", (book_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Book not found")
+    count = scan_book(conn, book_id)
+    recompute_stats(conn)
+    return {"book_id": book_id, "audio_files": count}

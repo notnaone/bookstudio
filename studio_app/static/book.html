@@ -15,12 +15,17 @@
     Incomplete draft profile. Set publisher and genre to clear this banner.
   </div>
 
-  <h2>Stats</h2>
+  <h2>Stats <button id="rescan-audio" type="button" style="font-size:12px; margin-left:8px">Re-scan audio</button>
+  <span id="rescan-status" class="muted"></span></h2>
   <table>
     <tr><th>Format</th><td id="format"></td></tr>
     <tr><th>Pages</th><td id="pages"></td></tr>
     <tr><th>Body chars</th><td id="body_chars"></td></tr>
     <tr><th>Chars / page</th><td id="cpp"></td></tr>
+    <tr><th>Hours recorded</th><td id="h_recorded">—</td></tr>
+    <tr><th>Chars / hour</th><td id="chars_per_hour">—</td></tr>
+    <tr><th>Pages / hour</th><td id="pages_per_hour">—</td></tr>
+    <tr><th>Progress</th><td id="progress_pct">—</td></tr>
   </table>
 
   <h2>Edit</h2>

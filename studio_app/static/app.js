@@ -179,6 +179,32 @@ async function setupBookPage() {
   document.getElementById('pages').textContent = b.pages || '—';
   document.getElementById('body_chars').textContent = b.body_chars.toLocaleString();
   document.getElementById('cpp').textContent = b.chars_per_page || '—';
+
+  function fmtHours(seconds) { return seconds > 0 ? (seconds / 3600).toFixed(2) : '—'; }
+  function fmtRound(x) { return x > 0 ? Math.round(x).toLocaleString() : '—'; }
+  function fmtPct(x) { return x > 0 ? (x * 100).toFixed(1) + '%' : '—'; }
+
+  const stats = b.stats || {};
+  document.getElementById('h_recorded').textContent = fmtHours(stats.total_audio_seconds || 0);
+  document.getElementById('chars_per_hour').textContent = fmtRound(stats.chars_per_hour || 0);
+  document.getElementById('pages_per_hour').textContent = fmtRound(stats.pages_per_hour || 0);
+  document.getElementById('progress_pct').textContent = fmtPct(stats.progress_pct || 0);
+
+  document.getElementById('rescan-audio').addEventListener('click', async () => {
+    const status = document.getElementById('rescan-status');
+    status.textContent = 'Scanning…';
+    try {
+      const r = await jsonFetch(`/api/books/${id}/rescan_audio`, { method: 'POST' });
+      status.textContent = `${r.audio_files} file(s).`;
+      const refreshed = await jsonFetch(`/api/books/${id}`);
+      const s = refreshed.stats;
+      document.getElementById('h_recorded').textContent = fmtHours(s.total_audio_seconds);
+      document.getElementById('chars_per_hour').textContent = fmtRound(s.chars_per_hour);
+      document.getElementById('pages_per_hour').textContent = fmtRound(s.pages_per_hour);
+      document.getElementById('progress_pct').textContent = fmtPct(s.progress_pct);
+    } catch (e) { status.textContent = e.message; }
+  });
+
   document.getElementById('source_path').textContent = b.source_path;
   document.getElementById('f-status').value = b.status;
   document.getElementById('f-genre').value = b.genre || '';
@@ -271,6 +297,27 @@ async function setupNarratorPage() {
       status.textContent = 'Saved.';
     } catch (e) { status.textContent = e.message; }
   });
+
+  const stats = n.stats || {};
+  document.getElementById('s-assigned').textContent = stats.books_assigned || 0;
+  document.getElementById('s-done').textContent = stats.books_done || 0;
+  document.getElementById('s-hours').textContent =
+    stats.total_audio_seconds > 0 ? (stats.total_audio_seconds / 3600).toFixed(2) : '—';
+  document.getElementById('s-cph').textContent =
+    stats.avg_chars_per_hour > 0 ? Math.round(stats.avg_chars_per_hour).toLocaleString() : '—';
+  document.getElementById('s-pph').textContent =
+    stats.avg_pages_per_hour > 0 ? Math.round(stats.avg_pages_per_hour).toLocaleString() : '—';
+
+  const history = n.history || [];
+  const histBody = document.querySelector('#history-table tbody');
+  histBody.innerHTML = history.length
+    ? history.map(h => `
+      <tr onclick="location.href='/books/${h.book_id}'" style="cursor:pointer">
+        <td>${escapeHtml(h.title)}</td>
+        <td>${h.assigned_at || '—'}</td>
+        <td>${h.finished_at || '<span class="muted">active</span>'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" class="muted">No history yet.</td></tr>';
 
   const { books } = await jsonFetch(`/api/books?narrator_id=${nid}`);
   const currentBody = document.querySelector('#current-table tbody');

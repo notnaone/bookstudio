@@ -25,3 +25,9 @@ async def test_narrator_page_returns_html(client):
     r = await client.get("/narrators/1")
     assert r.status_code == 200
     assert "<h1" in r.text
+
+
+async def test_heartbeat_includes_last_audio_scan_at_key(client):
+    r = await client.get("/api/heartbeat")
+    body = r.json()
+    assert "last_audio_scan_at" in body

@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** The previous agent built Phases 1 + 2 and has the Phase 3 plan ready to execute. Your job is to continue the same workflow, dispatching cheap Haiku subagents per task and auditing their work.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1 + 2 are shipped; Phase 3 is in progress on `phase-3-audio-scanner`. Your job is to continue the same workflow, dispatching Composer subagents per task and auditing their work.
 
 ---
 
@@ -47,7 +47,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 
 - **Phase 1 — Foundation:** FastAPI on `127.0.0.1:8765`, SQLite (WAL, FK on), all 12 tables + indexes from the spec, first-run `/setup` wizard, book upload+ingest, minimal library page. End-to-end demo verified live.
 - **Phase 2 — Library Screens & CRUD:** Publishers + Narrators CRUD, `PATCH /api/books/:id` with status/genre/narrator/publisher/etc., draft-clear gate, `narrator_book` history wiring (SAVEPOINT-wrapped), library tabs UI with filters, narrator detail screen, editable book detail form.
-- **Cumulative tests:** 78 passed + 2 skipped on `master`.
+- **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
+- **Cumulative tests:** 100 passed + 2 skipped on `master`.
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
@@ -70,7 +71,7 @@ This is the rhythm. Don't deviate without reason.
 
 ```
 1. Pick the next task from the current phase plan.
-2. Dispatch a single Haiku implementer subagent. Give it:
+2. Dispatch a single Composer implementer subagent. Give it:
    - Full task text copied from the plan (don't make it read the plan file)
    - Working dir + branch name
    - Previous commit SHA so it has context
@@ -78,9 +79,9 @@ This is the rhythm. Don't deviate without reason.
    - Explicit "report SHA + git log -1 --stat back"
 3. Verify the implementer's commit:
    - Run `uv run pytest -q` and confirm the cumulative target.
-   - For substantial logic, dispatch a second Haiku (separate subagent) for
+   - For substantial logic, dispatch a second Composer (separate subagent) for
      spec + quality review. For trivial copy-paste tasks, self-verify.
-4. If review finds a real bug, dispatch a Haiku fix subagent with precise
+4. If review finds a real bug, dispatch a Composer fix subagent with precise
    instructions. Then re-verify.
 5. Update the phase progress ledger (`docs/superpowers/progress/<phase>.md`).
 6. Commit the ledger update with `docs(progress): <task> done`.
@@ -92,18 +93,18 @@ When all tasks pass: Opus (you) does the **phase audit**:
 - Boot the app via `uv run studio-app` in the background.
 - Use curl to exercise the demo flow named in the plan's "done-criteria".
 - Read the new/changed source files end-to-end. Find issues a Haiku reviewer would miss.
-- Apply small surgical hardening fixes inline (or dispatch one Haiku for them).
+- Apply small surgical hardening fixes inline (or dispatch one Composer for them).
 - Merge the phase branch to `master` with `--no-ff` and a summary message.
 - Create the next phase branch and write its plan.
 
 ## Subagent dispatch — what works
 
-- **Model:** `haiku` for everything (implementer, reviewers, fix loops). The user is cost-sensitive.
+- **Model:** `composer-2.5-fast` for everything (implementer, reviewers, fix loops).
 - **Type:** `general-purpose` agent.
 - **Foreground.** Don't background subagent dispatches — you need their result before the next step.
 - **Prompt construction:** brief them like a smart colleague who walked in cold. They don't see this conversation. Include exact code blocks for every step. Don't write "implement the function" — paste the function body.
-- **Discipline lines:** every dispatch should list which files are in scope and which are explicitly forbidden. The Haikus respect this.
-- **`SendMessage` is for cross-CCD-session messaging, NOT for continuing a subagent.** To continue a fix loop, dispatch a fresh Haiku with specific repair instructions.
+- **Discipline lines:** every dispatch should list which files are in scope and which are explicitly forbidden. Subagents respect this.
+- **`SendMessage` is for cross-CCD-session messaging, NOT for continuing a subagent.** To continue a fix loop, dispatch a fresh Composer with specific repair instructions.
 
 ## When to push back on feedback
 
@@ -121,7 +122,7 @@ Don't blindly apply. Don't blindly reject. Say which you accept and why, and whi
 - `superpowers:writing-plans` — drafts per-phase plan files.
 - `superpowers:subagent-driven-development` — the per-task implementer/reviewer loop.
 - `superpowers:brainstorming` — already done (produced the design spec).
-- `superpowers:test-driven-development` — Haikus follow it because we hand them failing tests.
+- `superpowers:test-driven-development` — implementers follow it because we hand them failing tests.
 - `superpowers:verification-before-completion` — relevant when you claim a phase done.
 
 You don't need to re-invoke these. The pattern is established.
@@ -137,7 +138,7 @@ You don't need to re-invoke these. The pattern is established.
 
 ## Pace + spend awareness
 
-The previous session hit the platform monthly spend limit mid-fix once. When that happens, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent. Save Haiku dispatches for substantial work (full task implementations + per-task reviews).
+When blocked by platform limits, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent.
 
 After Phase 3 ships, the user will likely want Phases 4–7 planned + dispatched the same way. Phase 4 (Live Viewer + reading sessions) is the largest — split it into sub-phases if needed.
 
@@ -145,14 +146,13 @@ After Phase 3 ships, the user will likely want Phases 4–7 planned + dispatched
 
 If you are reading this in a fresh session:
 
-1. `git checkout phase-3-audio-scanner` and verify you're at the tip (HEAD should be the commit that landed `docs/superpowers/plans/2026-06-12-phase-3-audio-scanner.md`).
-2. Read `docs/superpowers/plans/2026-06-12-phase-3-audio-scanner.md` end-to-end.
-3. Create a Phase 3 progress ledger at `docs/superpowers/progress/2026-06-12-phase-3.md` (template: copy the Phase 2 ledger structure, blank out the task statuses).
-4. Create TaskList entries for the 7 Phase 3 tasks + one "Phase 3 audit + merge".
-5. Dispatch the first Haiku implementer for Phase 3 Task 0 (silent-MP3 fixture).
-6. Continue the loop.
+1. `git fetch origin && git checkout master && git pull`.
+2. Confirm `uv run pytest -q` → 100 passed + 2 skipped.
+3. Read `docs/superpowers/progress/2026-06-12-phase-3.md` (Phase 3 shipped).
+4. Branch `phase-4-live-viewer` off `master`; write its plan + progress ledger.
+5. Dispatch Composer for Phase 4 Task 0 onward.
 
-When Phase 3 audit passes: merge to `master`, branch `phase-4-live-viewer`, write its plan.
+See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.
 
 ---
 
