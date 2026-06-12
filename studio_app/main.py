@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from studio_app.db import connect, migrate
 from studio_app.routes import books as books_routes
+from studio_app.routes import narrators as narrators_routes
 from studio_app.routes import publishers as publishers_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
@@ -34,6 +35,7 @@ def build_app(
     app.include_router(books_routes.router)
     app.include_router(settings_routes.router)
     app.include_router(publishers_routes.router)
+    app.include_router(narrators_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
