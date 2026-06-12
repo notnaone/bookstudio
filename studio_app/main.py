@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from studio_app.db import connect, migrate
+from studio_app.routes import books as books_routes
 from studio_app.routes import system as system_routes
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -27,6 +28,7 @@ def build_app(
     app.state.data_root = data_root
     app.state.local_state_dir = local_state_dir
     app.include_router(system_routes.router)
+    app.include_router(books_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
 
