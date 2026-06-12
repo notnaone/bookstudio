@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -158,6 +159,25 @@ async def patch_book(book_id: int, request: Request) -> dict:
             updates[fld] = payload[fld]
     if not updates:
         return _book_row_to_dict(row)
+
+    # Maintain the narrator_book history when the narrator assignment changes.
+    new_narr = updates.get("narrator_id", row["narrator_id"])
+    old_narr = row["narrator_id"]
+    if "narrator_id" in updates and new_narr != old_narr:
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if old_narr is not None:
+            conn.execute(
+                "UPDATE narrator_book SET finished_at = ?"
+                " WHERE book_id = ? AND narrator_id = ? AND finished_at IS NULL",
+                (now, book_id, old_narr),
+            )
+        if new_narr is not None:
+            conn.execute(
+                "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)"
+                " ON CONFLICT(narrator_id, book_id) DO UPDATE SET finished_at = NULL",
+                (new_narr, book_id),
+            )
+
     cols = ", ".join(f"{k} = ?" for k in updates)
     params = list(updates.values()) + [book_id]
     conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
