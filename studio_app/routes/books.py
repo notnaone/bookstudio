@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
+from studio_app.db_lock import hold
 from studio_app.ingest import ingest_book
 
 router = APIRouter()
@@ -127,7 +128,6 @@ async def create_book(
         try:
             tmp_path.unlink()
         except (FileNotFoundError, PermissionError, OSError):
-            # On Windows the parser may still hold a handle; OS cleans up on GC.
             pass
 
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
@@ -141,6 +141,7 @@ _PATCHABLE_FIELDS = {
     "is_draft",
 }
 _ALLOWED_STATUS = {"planned", "in_progress", "done", "archived"}
+_TERMINAL_STATUS = {"done", "archived"}
 
 
 @router.patch("/api/books/{book_id}")
@@ -182,45 +183,78 @@ async def patch_book(book_id: int, request: Request) -> dict:
     if not updates:
         return _book_row_to_dict(row)
 
-    # Wrap history wiring + book UPDATE in a savepoint so a downstream FK
-    # violation (e.g. unknown publisher_id) cannot leave an orphan history row.
-    conn.execute("SAVEPOINT patch_book")
-    try:
-        new_narr = updates.get("narrator_id", row["narrator_id"])
-        old_narr = row["narrator_id"]
-        if "narrator_id" in updates and new_narr != old_narr:
+    with hold(request.app.state.db_lock):
+        conn.execute("SAVEPOINT patch_book")
+        try:
             now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-            if old_narr is not None:
-                conn.execute(
-                    "UPDATE narrator_book SET finished_at = ?"
-                    " WHERE book_id = ? AND narrator_id = ? AND finished_at IS NULL",
-                    (now, book_id, old_narr),
-                )
-            if new_narr is not None:
-                conn.execute(
-                    "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)"
-                    " ON CONFLICT(narrator_id, book_id) DO UPDATE SET finished_at = NULL",
-                    (new_narr, book_id),
-                )
-        cols = ", ".join(f"{k} = ?" for k in updates)
-        params = list(updates.values()) + [book_id]
-        conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
-    except sqlite3.IntegrityError as exc:
-        conn.execute("ROLLBACK TO SAVEPOINT patch_book")
-        conn.execute("RELEASE SAVEPOINT patch_book")
-        raise HTTPException(400, f"Foreign key constraint failed: {exc}") from exc
-    conn.execute("RELEASE SAVEPOINT patch_book")
+            new_narr = updates.get("narrator_id", row["narrator_id"])
+            old_narr = row["narrator_id"]
+            if "narrator_id" in updates and new_narr != old_narr:
+                if old_narr is not None:
+                    conn.execute(
+                        "UPDATE narrator_book SET finished_at = ?"
+                        " WHERE book_id = ? AND narrator_id = ? AND finished_at IS NULL",
+                        (now, book_id, old_narr),
+                    )
+                if new_narr is not None:
+                    conn.execute(
+                        "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)"
+                        " ON CONFLICT(narrator_id, book_id) DO UPDATE SET"
+                        " finished_at = NULL, assigned_at = CURRENT_TIMESTAMP",
+                        (new_narr, book_id),
+                    )
+
+            if "status" in updates:
+                new_status = updates["status"]
+                old_status = row["status"]
+                narr = updates.get("narrator_id", row["narrator_id"])
+                if new_status != old_status and narr is not None:
+                    if new_status in _TERMINAL_STATUS:
+                        conn.execute(
+                            "UPDATE narrator_book SET finished_at = ?"
+                            " WHERE book_id = ? AND narrator_id = ?"
+                            " AND finished_at IS NULL",
+                            (now, book_id, narr),
+                        )
+                    elif old_status in _TERMINAL_STATUS and new_status in (
+                        "planned", "in_progress"
+                    ):
+                        conn.execute(
+                            "UPDATE narrator_book SET finished_at = NULL"
+                            " WHERE book_id = ? AND narrator_id = ?",
+                            (book_id, narr),
+                        )
+
+            cols = ", ".join(f"{k} = ?" for k in updates)
+            params = list(updates.values()) + [book_id]
+            conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
+            conn.execute("RELEASE SAVEPOINT patch_book")
+        except sqlite3.IntegrityError as exc:
+            conn.execute("ROLLBACK TO SAVEPOINT patch_book")
+            conn.execute("RELEASE SAVEPOINT patch_book")
+            raise HTTPException(400, f"Foreign key constraint failed: {exc}") from exc
+        except Exception:
+            conn.execute("ROLLBACK TO SAVEPOINT patch_book")
+            conn.execute("RELEASE SAVEPOINT patch_book")
+            raise
+
+        if "audio_folder" in updates:
+            from studio_app.audio_scanner import recompute_stats, scan_book
+            scan_book(conn, book_id)
+            recompute_stats(conn)
+
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     return _book_row_to_dict(row)
 
 
 @router.post("/api/books/{book_id}/rescan_audio")
 def rescan_audio(book_id: int, request: Request) -> dict:
-    from studio_app.audio_scanner import scan_book, recompute_stats
+    from studio_app.audio_scanner import recompute_stats, scan_book
     conn = request.app.state.conn
     row = conn.execute("SELECT id FROM book WHERE id = ?", (book_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Book not found")
-    count = scan_book(conn, book_id)
-    recompute_stats(conn)
+    with hold(request.app.state.db_lock):
+        count = scan_book(conn, book_id)
+        recompute_stats(conn)
     return {"book_id": book_id, "audio_files": count}
