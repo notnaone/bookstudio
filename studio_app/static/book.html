@@ -11,16 +11,45 @@
 <main>
   <h1 id="title">Loading…</h1>
   <p class="muted" id="meta"></p>
+  <div id="draft-banner" class="muted" style="display:none; padding:10px; border:1px solid var(--border); border-radius:6px; margin-bottom:12px;">
+    Incomplete draft profile. Set publisher and genre to clear this banner.
+  </div>
+
+  <h2>Stats</h2>
   <table>
     <tr><th>Format</th><td id="format"></td></tr>
     <tr><th>Pages</th><td id="pages"></td></tr>
     <tr><th>Body chars</th><td id="body_chars"></td></tr>
-    <tr><th>Raw chars</th><td id="raw_chars"></td></tr>
     <tr><th>Chars / page</th><td id="cpp"></td></tr>
-    <tr><th>Images</th><td id="images"></td></tr>
-    <tr><th>Status</th><td id="status"></td></tr>
-    <tr><th>Source path</th><td id="source_path" class="muted"></td></tr>
   </table>
+
+  <h2>Edit</h2>
+  <form id="book-form" class="col">
+    <div class="field"><label>Status</label>
+      <select id="f-status">
+        <option value="planned">Planned</option>
+        <option value="in_progress">In progress</option>
+        <option value="done">Done</option>
+        <option value="archived">Archived</option>
+      </select>
+    </div>
+    <div class="field"><label>Narrator</label>
+      <select id="f-narrator"><option value="">Unassigned</option></select>
+    </div>
+    <div class="field"><label>Publisher</label>
+      <select id="f-publisher"><option value="">None</option></select>
+    </div>
+    <div class="field"><label>Genre</label><input id="f-genre"></div>
+    <div class="field"><label>Planned end</label><input id="f-planned-end" type="date"></div>
+    <div class="field"><label>Publisher notes</label><textarea id="f-notes" rows="3"></textarea></div>
+    <div class="field"><label>Audio folder</label><input id="f-audio"></div>
+    <div><button class="primary" type="submit">Save</button>
+      <span id="save-status" class="muted"></span>
+      <button id="clear-draft" type="button" style="margin-left:12px; display:none">Confirm setup (clear draft)</button>
+    </div>
+  </form>
+
+  <p class="muted">Source path: <span id="source_path"></span></p>
 </main>
 <script src="/static/app.js"></script>
 <script>setupBookPage();</script>

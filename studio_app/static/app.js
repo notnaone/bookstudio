@@ -167,17 +167,75 @@ async function onCreatePublisher(e) {
 
 async function setupBookPage() {
   const id = location.pathname.split('/').pop();
-  const b = await jsonFetch(`/api/books/${id}`);
+  const [b, narrators, publishers] = await Promise.all([
+    jsonFetch(`/api/books/${id}`),
+    jsonFetch('/api/narrators'),
+    jsonFetch('/api/publishers'),
+  ]);
+
   document.getElementById('title').textContent = b.title;
   document.getElementById('meta').textContent = `Slug: ${b.slug}`;
   document.getElementById('format').textContent = b.format;
   document.getElementById('pages').textContent = b.pages || '—';
   document.getElementById('body_chars').textContent = b.body_chars.toLocaleString();
-  document.getElementById('raw_chars').textContent = b.raw_chars.toLocaleString();
   document.getElementById('cpp').textContent = b.chars_per_page || '—';
-  document.getElementById('images').textContent = b.images;
-  document.getElementById('status').textContent = b.status;
   document.getElementById('source_path').textContent = b.source_path;
+  document.getElementById('f-status').value = b.status;
+  document.getElementById('f-genre').value = b.genre || '';
+  document.getElementById('f-planned-end').value = b.planned_end || '';
+  document.getElementById('f-notes').value = b.publisher_notes || '';
+  document.getElementById('f-audio').value = b.audio_folder || '';
+
+  const nsel = document.getElementById('f-narrator');
+  nsel.innerHTML = '<option value="">Unassigned</option>' +
+    narrators.narrators.map(n => `<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('');
+  nsel.value = b.narrator_id == null ? '' : String(b.narrator_id);
+
+  const psel = document.getElementById('f-publisher');
+  psel.innerHTML = '<option value="">None</option>' +
+    publishers.publishers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  psel.value = b.publisher_id == null ? '' : String(b.publisher_id);
+
+  if (b.is_draft) {
+    document.getElementById('draft-banner').style.display = 'block';
+    document.getElementById('clear-draft').style.display = 'inline';
+  }
+
+  document.getElementById('book-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await savePatch({});
+  });
+
+  document.getElementById('clear-draft').addEventListener('click', async () => {
+    await savePatch({ is_draft: false });
+  });
+
+  async function savePatch(extra) {
+    const status = document.getElementById('save-status');
+    status.textContent = 'Saving…';
+    const payload = {
+      status: document.getElementById('f-status').value,
+      genre: document.getElementById('f-genre').value || null,
+      planned_end: document.getElementById('f-planned-end').value || null,
+      publisher_notes: document.getElementById('f-notes').value || null,
+      audio_folder: document.getElementById('f-audio').value || null,
+      narrator_id: nsel.value ? Number(nsel.value) : null,
+      publisher_id: psel.value ? Number(psel.value) : null,
+      ...extra,
+    };
+    try {
+      const updated = await jsonFetch(`/api/books/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      status.textContent = 'Saved.';
+      if (!updated.is_draft) {
+        document.getElementById('draft-banner').style.display = 'none';
+        document.getElementById('clear-draft').style.display = 'none';
+      }
+    } catch (e) { status.textContent = e.message; }
+  }
 }
 
 function escapeHtml(s) {
