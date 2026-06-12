@@ -49,7 +49,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 1 — Foundation:** FastAPI on `127.0.0.1:8765`, SQLite (WAL, FK on), all 12 tables + indexes from the spec, first-run `/setup` wizard, book upload+ingest, minimal library page. End-to-end demo verified live.
 - **Phase 2 — Library Screens & CRUD:** Publishers + Narrators CRUD, `PATCH /api/books/:id` with status/genre/narrator/publisher/etc., draft-clear gate, `narrator_book` history wiring (SAVEPOINT-wrapped), library tabs UI with filters, narrator detail screen, editable book detail form.
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
-- **Cumulative tests:** 100 passed + 2 skipped on `master`.
+- **Phase 4 — Live Viewer (in progress on `phase-4-live-viewer`):** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view.
+- **Cumulative tests:** 105 passed + 2 skipped on `master`; 129 passed + 2 skipped on `phase-4-live-viewer` (Task 12 audit pending).
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
