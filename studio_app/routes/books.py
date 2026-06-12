@@ -27,8 +27,11 @@ def _book_row_to_dict(row) -> dict:
         "current_page": row["current_page"],
         "publisher_id": row["publisher_id"],
         "narrator_id": row["narrator_id"],
+        "genre": row["genre"],
+        "publisher_notes": row["publisher_notes"],
         "planned_end": row["planned_end"],
         "audio_folder": row["audio_folder"],
+        "drive_sync_path": row["drive_sync_path"],
         "source_path": row["source_path"],
         "view_path": row["view_path"],
     }
@@ -84,5 +87,59 @@ async def create_book(
             # On Windows the parser may still hold a handle; OS cleans up on GC.
             pass
 
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    return _book_row_to_dict(row)
+
+
+_PATCHABLE_FIELDS = {
+    "status", "genre", "publisher_notes", "planned_end",
+    "publisher_id", "narrator_id",
+    "audio_folder", "drive_sync_path",
+    "is_draft",
+}
+_ALLOWED_STATUS = {"planned", "in_progress", "done", "archived"}
+
+
+@router.patch("/api/books/{book_id}")
+async def patch_book(book_id: int, request: Request) -> dict:
+    conn = request.app.state.conn
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Book not found")
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "JSON object required")
+    unknown = set(payload.keys()) - _PATCHABLE_FIELDS
+    if unknown:
+        raise HTTPException(400, f"Unknown field(s): {sorted(unknown)}")
+    updates: dict = {}
+    if "status" in payload:
+        if payload["status"] not in _ALLOWED_STATUS:
+            raise HTTPException(
+                400, f"status must be one of {sorted(_ALLOWED_STATUS)}"
+            )
+        updates["status"] = payload["status"]
+    if "is_draft" in payload:
+        wants_draft = bool(payload["is_draft"])
+        if not wants_draft:
+            new_publisher = payload.get("publisher_id", row["publisher_id"])
+            new_genre = payload.get("genre", row["genre"])
+            if new_publisher is None or not (new_genre or "").strip():
+                raise HTTPException(
+                    400,
+                    "Cannot clear draft: publisher_id and genre must be set first",
+                )
+        updates["is_draft"] = 1 if wants_draft else 0
+    for fld in (
+        "genre", "publisher_notes", "planned_end",
+        "publisher_id", "narrator_id", "audio_folder", "drive_sync_path",
+    ):
+        if fld in payload:
+            updates[fld] = payload[fld]
+    if not updates:
+        return _book_row_to_dict(row)
+    cols = ", ".join(f"{k} = ?" for k in updates)
+    params = list(updates.values()) + [book_id]
+    conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     return _book_row_to_dict(row)

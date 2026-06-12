@@ -97,3 +97,67 @@ async def test_post_book_large_payload_streamed(client, tmp_path: Path):
     body = r.json()
     # parser counts non-whitespace chars; "paragraph" is 9 chars, x 100k = 900k
     assert body["body_chars"] > 500_000
+
+
+async def _create_test_book(client, tmp_path, title="Edit Me"):
+    sample = tmp_path / "patch.txt"
+    shutil.copy(FIXTURES / "sample.txt", sample)
+    with sample.open("rb") as fh:
+        r = await client.post(
+            "/api/books",
+            files={"file": ("patch.txt", fh, "text/plain")},
+            data={"title": title},
+        )
+    return r.json()["id"]
+
+
+async def test_patch_book_updates_status(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path)
+    r = await client.patch(f"/api/books/{bid}", json={"status": "in_progress"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "in_progress"
+
+
+async def test_patch_book_rejects_invalid_status(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path)
+    r = await client.patch(f"/api/books/{bid}", json={"status": "nope"})
+    assert r.status_code == 400
+
+
+async def test_patch_book_updates_metadata_fields(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path)
+    r = await client.patch(
+        f"/api/books/{bid}",
+        json={
+            "genre": "Sci-Fi",
+            "publisher_notes": "delivered 2026-05",
+            "planned_end": "2026-07-15",
+        },
+    )
+    body = r.json()
+    assert body["genre"] == "Sci-Fi"
+    assert body["publisher_notes"] == "delivered 2026-05"
+    assert body["planned_end"] == "2026-07-15"
+
+
+async def test_patch_book_rejects_unknown_field(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path)
+    r = await client.patch(f"/api/books/{bid}", json={"slug": "hijack"})
+    assert r.status_code == 400
+
+
+async def test_patch_book_404(client):
+    r = await client.patch("/api/books/9999", json={"status": "done"})
+    assert r.status_code == 404
+
+
+async def test_patch_book_clear_draft_requires_publisher_and_genre(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path)
+    # Force into draft state first.
+    r = await client.patch(f"/api/books/{bid}", json={"is_draft": True})
+    assert r.status_code == 200 and r.json()["is_draft"] == 1
+    # Now refuse to clear with missing required fields.
+    r = await client.patch(f"/api/books/{bid}", json={"is_draft": False})
+    assert r.status_code == 400
+    detail = r.json()["detail"].lower()
+    assert "publisher" in detail or "genre" in detail
