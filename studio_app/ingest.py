@@ -5,6 +5,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+from studio_app.pagination import paginate_docx, paginate_txt, write_pages_to_dir
 from studio_app.parser_adapter import parse_book
 from studio_app.slug import slugify
 
@@ -77,7 +78,19 @@ def ingest_book(
         encoding="utf-8",
     )
 
-    view_path = str(dest)
+    if parsed.format == "txt":
+        text = dest.read_text(encoding="utf-8", errors="replace")
+        cpp = parsed.chars_per_page or 1800
+        pages = paginate_txt(text, cpp)
+        write_pages_to_dir(view_dir, pages)
+        view_path = str(view_dir)
+    elif parsed.format == "docx":
+        cpp = parsed.chars_per_page or 1800
+        pages = paginate_docx(dest, cpp)
+        write_pages_to_dir(view_dir, pages)
+        view_path = str(view_dir)
+    else:
+        view_path = str(dest)  # pdf/epub: source file
 
     try:
         cur = conn.execute(

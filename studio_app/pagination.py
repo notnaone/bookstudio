@@ -81,3 +81,11 @@ def paginate_docx(path: Path, chars_per_page: int) -> list[str]:
     with path.open("rb") as fh:
         result = mammoth.convert_to_html(fh)
     return paginate_html_to_pages(result.value, chars_per_page)
+
+
+def write_pages_to_dir(view_dir: Path, pages: list[str]) -> int:
+    """Write page-0001.html … into view_dir. Returns page count."""
+    view_dir.mkdir(parents=True, exist_ok=True)
+    for i, html in enumerate(pages, start=1):
+        (view_dir / f"page-{i:04d}.html").write_text(html, encoding="utf-8")
+    return len(pages)

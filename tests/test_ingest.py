@@ -8,6 +8,7 @@ import pytest
 from studio_app.ingest import ingest_book
 
 FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES_INGEST = Path(__file__).parent / "fixtures"
 
 
 def test_ingest_book_copies_source_under_data_root(conn, data_root: Path, tmp_path: Path):
@@ -92,3 +93,26 @@ def test_ingest_book_uses_original_filename_when_provided(conn, data_root, tmp_p
 )
 def test_ingest_book_rolls_back_dir_on_insert_failure():
     pass
+
+
+def test_ingest_txt_writes_paginated_view_pages(conn, data_root, tmp_path):
+    src = tmp_path / "book.txt"
+    shutil.copy(FIXTURES_INGEST / "sample.txt", src)
+    bid = ingest_book(conn, data_root, src, title="Paginated TXT")
+    row = conn.execute("SELECT view_path, format FROM book WHERE id=?", (bid,)).fetchone()
+    assert row["format"] == "txt"
+    view_dir = Path(row["view_path"])
+    assert view_dir.is_dir()
+    pages = sorted(view_dir.glob("page-*.html"))
+    assert len(pages) >= 1
+
+
+def test_ingest_docx_writes_paginated_view_pages(conn, data_root, tmp_path):
+    src = tmp_path / "book.docx"
+    shutil.copy(FIXTURES_INGEST / "tiny.docx", src)
+    bid = ingest_book(conn, data_root, src, title="Paginated DOCX")
+    row = conn.execute("SELECT view_path, format FROM book WHERE id=?", (bid,)).fetchone()
+    assert row["format"] == "docx"
+    view_dir = Path(row["view_path"])
+    assert view_dir.is_dir()
+    assert list(view_dir.glob("page-*.html"))
