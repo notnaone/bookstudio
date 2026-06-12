@@ -16,4 +16,4 @@ def slugify(title: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
     if not s:
         return "book"
-    return s[:MAX_LEN]
+    return s[:MAX_LEN].rstrip("-") or "book"
