@@ -47,3 +47,8 @@ async def test_live_page_returns_html(client):
 async def test_live_split_page_returns_html(client):
     r = await client.get("/live/1/2")
     assert r.status_code == 200
+
+
+async def test_heartbeat_includes_last_calendar_sync_at_key(client):
+    r = await client.get("/api/heartbeat")
+    assert "last_calendar_sync_at" in r.json()

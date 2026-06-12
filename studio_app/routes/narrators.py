@@ -38,6 +38,27 @@ def _stats_for_narrator(conn, narrator_id: int) -> dict:
     }
 
 
+def _upcoming_sessions(conn, narrator_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, source, start_time, end_time, raw_title, action_status"
+        " FROM schedule_item"
+        " WHERE resolved_narrator_id = ? AND start_time > datetime('now')"
+        " ORDER BY start_time",
+        (narrator_id,),
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "source": r["source"],
+            "start_time": r["start_time"],
+            "end_time": r["end_time"],
+            "raw_title": r["raw_title"],
+            "action_status": r["action_status"],
+        }
+        for r in rows
+    ]
+
+
 def _history_for_narrator(conn, narrator_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT nb.book_id, b.title, nb.assigned_at, nb.finished_at"
@@ -74,6 +95,7 @@ def get_narrator(nid: int, request: Request) -> dict:
     body = _row(row)
     body["stats"] = _stats_for_narrator(conn, nid)
     body["history"] = _history_for_narrator(conn, nid)
+    body["upcoming_sessions"] = _upcoming_sessions(conn, nid)
     return body
 
 

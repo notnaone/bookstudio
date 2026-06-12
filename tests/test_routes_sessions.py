@@ -19,6 +19,21 @@ async def _upload_book(client, tmp_path: Path, *, title: str = "Session Book") -
     return r.json()
 
 
+async def test_get_reading_session(client, tmp_path: Path):
+    book = await _upload_book(client, tmp_path)
+    created = await client.post(
+        "/api/reading_session",
+        json={"book_id": book["id"]},
+    )
+    session_id = created.json()["id"]
+    r = await client.get(f"/api/reading_session/{session_id}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == session_id
+    assert body["book_id"] == book["id"]
+    assert body["ended_at"] is None
+
+
 async def test_create_session_sets_start_page_from_book(
     client, conn, tmp_path: Path
 ):

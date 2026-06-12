@@ -1,0 +1,28 @@
+.schedule-toolbar { justify-content: space-between; align-items: center; }
+.schedule-toolbar h1 { margin: 0; }
+.schedule-view { display: none; }
+.schedule-view.active { display: block; }
+.lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.lane { border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-height: 200px; }
+.lane h2 { margin-top: 0; font-size: 1rem; color: var(--muted); }
+.lane-item {
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  margin-bottom: 8px; cursor: pointer;
+}
+.lane-item.today { border-color: var(--accent); }
+.lane-item.source-studio_1 { border-left: 3px solid #5b8def; }
+.lane-item.source-studio_2 { border-left: 3px solid #8b5bef; }
+.lane-item.source-manual { border-left: 3px solid #5bef8b; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-backdrop.hidden { display: none; }
+.modal {
+  background: #1a1d23; border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; max-width: 520px; width: 90%;
+}
+.jit-modal { max-width: 560px; }
+.modal-actions { margin-top: 16px; }
+.hidden { display: none; }
+.manual-form { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }

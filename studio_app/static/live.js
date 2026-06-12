@@ -326,11 +326,21 @@ class PaneController {
   }
 
   async startSession() {
-    const session = await jsonFetch('/api/reading_session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: this.book.id }),
-    });
+    const params = new URLSearchParams(window.location.search);
+    const existingId = params.get('session_id');
+    let session;
+    if (existingId) {
+      session = await jsonFetch(`/api/reading_session/${existingId}`);
+      if (session.ended_at) {
+        throw new Error('Session already ended');
+      }
+    } else {
+      session = await jsonFetch('/api/reading_session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: this.book.id }),
+      });
+    }
     this.sessionId = session.id;
     this.startPage = session.start_page;
     this.trackedProgressPage = session.tracked_progress_page;

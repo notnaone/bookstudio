@@ -26,6 +26,17 @@ def _session_row_to_dict(row) -> dict:
     }
 
 
+@router.get("/api/reading_session/{session_id}")
+def get_reading_session(session_id: int, request: Request) -> dict:
+    conn = request.app.state.conn
+    row = conn.execute(
+        "SELECT * FROM reading_session WHERE id = ?", (session_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Session not found")
+    return _session_row_to_dict(row)
+
+
 @router.post("/api/reading_session", status_code=201)
 async def create_reading_session(request: Request) -> dict:
     conn = request.app.state.conn

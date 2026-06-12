@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+import shutil
+import threading
+from pathlib import Path
+
 import pytest
+from httpx import ASGITransport, AsyncClient
+
+from studio_app.calendar_poller import CalendarPoller
+from studio_app.main import build_app
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _manual_payload(**overrides) -> dict:
@@ -165,3 +175,145 @@ async def test_delete_mirror_row_forbidden(client, conn):
 async def test_patch_unknown_schedule_item(client):
     r = await client.patch("/api/schedule/99999", json={"notes": "nope"})
     assert r.status_code == 404
+
+
+def _seed_narrator(conn, name: str, alias: str) -> int:
+    return conn.execute(
+        "INSERT INTO narrator (name, calendar_alias) VALUES (?, ?)",
+        (name, alias),
+    ).lastrowid
+
+
+def _seed_book(conn, *, narrator_id: int, title: str, status: str = "in_progress") -> int:
+    slug = title.lower().replace(" ", "-")
+    return conn.execute(
+        "INSERT INTO book (slug, title, format, source_path, view_path, narrator_id, status)"
+        " VALUES (?, ?, 'txt', '/x', '/x', ?, ?)",
+        (slug, title, narrator_id, status),
+    ).lastrowid
+
+
+async def _seed_calendar_event(conn, *, title: str) -> int:
+    return conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, google_event_id, start_time, end_time, raw_title)"
+        " VALUES ('studio_1', ?, '2026-06-21T10:00:00+00:00',"
+        " '2026-06-21T12:00:00+00:00', ?)",
+        (f"uid-{title}", title),
+    ).lastrowid
+
+
+async def test_start_session_case_a(client, conn):
+    narr = _seed_narrator(conn, "Chris", "Chris")
+    book_id = _seed_book(conn, narrator_id=narr, title="Chris Book")
+    item_id = await _seed_calendar_event(conn, title="Chris - Session")
+
+    r = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["mode"] == "A"
+    assert body["book_id"] == book_id
+    assert body["session_id"] > 0
+
+    sched = conn.execute(
+        "SELECT action_status, resolved_book_id FROM schedule_item WHERE id = ?",
+        (item_id,),
+    ).fetchone()
+    assert sched["action_status"] == "started"
+    assert sched["resolved_book_id"] == book_id
+
+
+async def test_start_session_case_b(client, conn):
+    narr = _seed_narrator(conn, "Chris", "Chris")
+    _seed_book(conn, narrator_id=narr, title="Book One")
+    _seed_book(conn, narrator_id=narr, title="Book Two")
+    item_id = await _seed_calendar_event(conn, title="Chris - Pick")
+
+    r = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert r.json()["mode"] == "B"
+    assert len(r.json()["candidate_books"]) == 2
+
+
+async def test_start_session_case_c(client, conn):
+    item_id = await _seed_calendar_event(conn, title="Unknown Person")
+    r = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert r.json()["mode"] == "C"
+
+
+async def test_start_session_longest_alias_wins(client, conn):
+    _seed_narrator(conn, "Chris", "Chris")
+    christina_id = _seed_narrator(conn, "Christina", "Christina")
+    _seed_book(conn, narrator_id=christina_id, title="Christina Book")
+    item_id = await _seed_calendar_event(conn, title="Christina - Bar")
+
+    r = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    body = r.json()
+    assert body["mode"] == "A"
+    sched = conn.execute(
+        "SELECT resolved_narrator_id FROM schedule_item WHERE id = ?",
+        (item_id,),
+    ).fetchone()
+    assert sched["resolved_narrator_id"] == christina_id
+
+
+async def test_schedule_refresh_with_poller(conn, data_root, local_state_dir):
+    conn.execute(
+        "INSERT INTO app_setting (key, value) VALUES ('data_root', ?),"
+        " ('ics_url_studio_1', 'http://test/ics')",
+        (str(data_root),),
+    )
+    poller = CalendarPoller(
+        conn,
+        interval_seconds=300,
+        fetch_fn=lambda url: (FIXTURES / "sample.ics").read_bytes(),
+        urls_provider=lambda c: {
+            "studio_1": "http://test/ics",
+            "studio_2": None,
+        },
+    )
+    app = build_app(
+        conn=conn,
+        data_root=data_root,
+        local_state_dir=local_state_dir,
+        calendar_poller=poller,
+        db_lock=threading.Lock(),
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post("/api/schedule/refresh")
+        assert r.status_code == 200, r.text
+        assert r.json()["synced_at"] is not None
+        hb = await client.get("/api/heartbeat")
+        assert hb.json()["last_calendar_sync_at"] is not None
+
+
+async def test_jit_onboard_creates_book_and_session(client, conn, tmp_path: Path):
+    item_id = await _seed_calendar_event(conn, title="New Voice - Pilot")
+    sample = tmp_path / "jit.txt"
+    shutil.copy(FIXTURES / "sample.txt", sample)
+    with sample.open("rb") as fh:
+        r = await client.post(
+            f"/api/schedule/{item_id}/jit",
+            files={"file": ("jit.txt", fh, "text/plain")},
+            data={
+                "title": "JIT Book",
+                "narrator_name": "New Voice",
+                "link_future_events": "true",
+            },
+        )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["book_id"] > 0
+    assert body["session_id"] > 0
+    book = conn.execute("SELECT is_draft, status FROM book WHERE id = ?", (body["book_id"],)).fetchone()
+    assert book["is_draft"] == 1
+    assert book["status"] == "in_progress"
+
+
+async def test_schedule_and_settings_pages(client):
+    r = await client.get("/schedule")
+    assert r.status_code == 200
+    assert "schedule-table" in r.text
+    r = await client.get("/settings")
+    assert r.status_code == 200
+    assert "ics1" in r.text
