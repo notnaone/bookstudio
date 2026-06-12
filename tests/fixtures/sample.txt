@@ -1,0 +1,8 @@
+Chapter 1
+
+This is a test paragraph. It has several sentences. The parser should
+count visible characters and ignore whitespace.
+
+Chapter 2
+
+Another paragraph in another chapter. This lets us verify chapter counting.
