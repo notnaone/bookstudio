@@ -147,11 +147,11 @@ After Phase 3 ships, the user will likely want Phases 4–7 planned + dispatched
 
 If you are reading this in a fresh session:
 
-1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 100 passed + 2 skipped.
-3. Read `docs/superpowers/progress/2026-06-12-phase-3.md` (Phase 3 shipped).
-4. Branch `phase-4-live-viewer` off `master`; write its plan + progress ledger.
-5. Dispatch Composer for Phase 4 Task 0 onward.
+1. `git fetch origin && git checkout phase-4-live-viewer && git pull`.
+2. Confirm `uv run pytest -q` → 105 passed + 2 skipped (baseline grows per task).
+3. Read `docs/superpowers/progress/2026-06-12-phase-4.md` for current task.
+4. Read `docs/superpowers/plans/2026-06-12-phase-4-live-viewer.md` from that task onward.
+5. Dispatch Composer for the next pending task; continue through Task 11, then Opus audit + merge.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.
 
