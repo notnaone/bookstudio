@@ -83,3 +83,46 @@ function escapeHtml(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
+
+async function setupNarratorPage() {
+  const nid = location.pathname.split('/').pop();
+  const n = await jsonFetch(`/api/narrators/${nid}`);
+  document.getElementById('name').textContent = n.name;
+  document.getElementById('f-name').value = n.name;
+  document.getElementById('f-alias').value = n.calendar_alias || '';
+  document.getElementById('f-notes').value = n.notes || '';
+
+  document.getElementById('narrator-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = document.getElementById('save-status');
+    status.textContent = 'Saving…';
+    const body = {
+      name: document.getElementById('f-name').value,
+      calendar_alias: document.getElementById('f-alias').value || null,
+      notes: document.getElementById('f-notes').value || null,
+    };
+    try {
+      const updated = await jsonFetch(`/api/narrators/${nid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      document.getElementById('name').textContent = updated.name;
+      status.textContent = 'Saved.';
+    } catch (e) { status.textContent = e.message; }
+  });
+
+  const { books } = await jsonFetch(`/api/books?narrator_id=${nid}`);
+  const currentBody = document.querySelector('#current-table tbody');
+  const current = books.filter(b => b.status === 'in_progress');
+  if (!current.length) {
+    currentBody.innerHTML = '<tr><td colspan="3" class="muted">No active books.</td></tr>';
+  } else {
+    currentBody.innerHTML = current.map(b => `
+      <tr onclick="location.href='/books/${b.id}'" style="cursor:pointer">
+        <td>${escapeHtml(b.title)}</td>
+        <td>${b.pages ? `${b.current_page}/${b.pages}` : `page ${b.current_page}`}</td>
+        <td>${b.planned_end || '—'}</td>
+      </tr>`).join('');
+  }
+}

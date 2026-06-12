@@ -59,6 +59,10 @@ def build_app(
     def book_page(book_id: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "book.html")
 
+    @app.get("/narrators/{nid}", include_in_schema=False)
+    def narrator_page(nid: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "narrator.html")
+
     return app
 
 
