@@ -1,6 +1,6 @@
 # Studio App — Implementation Roadmap
 
-> **For agentic workers:** This is a roadmap, not an executable plan. Each phase has its own plan file written immediately before its execution. The Phase 1 plan exists today (`2026-06-12-phase-1-foundation.md`); Phases 2–7 plans are written after their predecessor ships and we have ground truth to plan against.
+> **For agentic workers:** This is a roadmap, not an executable plan. Each phase has its own plan file written immediately before its execution. Phases 1–5 plans exist under `docs/superpowers/plans/`; Phases 6–7 are written after their predecessor ships.
 
 **Spec:** [`docs/superpowers/specs/2026-06-12-studio-app-design.md`](../specs/2026-06-12-studio-app-design.md)
 

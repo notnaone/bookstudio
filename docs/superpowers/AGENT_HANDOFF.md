@@ -40,8 +40,10 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
     │   ├── 2026-06-12-phase-2-library-screens.md      # ✅ shipped
     │   ├── 2026-06-12-phase-3-audio-scanner.md        # ✅ shipped
     │   ├── 2026-06-12-phase-4-live-viewer.md          # ✅ shipped
-    │   └── (phases 5-7 to be written just-in-time per phase)
+    │   ├── 2026-06-12-phase-5-schedule-calendar.md    # ← NEXT (in progress)
+    │   └── (phases 6-7 to be written just-in-time per phase)
     └── progress/                                       # per-phase execution ledgers
+        └── 2026-06-12-phase-5.md                       # Phase 5 ledger (active)
 ```
 
 ## What's shipped (don't re-derive)
@@ -150,8 +152,8 @@ If you are reading this in a fresh session:
 
 1. `git fetch origin && git checkout master && git pull`.
 2. Confirm `uv run pytest -q` → 132 passed + 2 skipped.
-3. Read `docs/superpowers/plans/2026-06-12-studio-app-roadmap.md` for Phase 5 scope.
-4. Create branch `phase-5-schedule-calendar`, write the Phase 5 plan + progress ledger.
+3. Read `docs/superpowers/plans/2026-06-12-phase-5-schedule-calendar.md` and `docs/superpowers/progress/2026-06-12-phase-5.md`.
+4. Checkout `phase-5-schedule-calendar` (plan + ledger already on branch).
 5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.

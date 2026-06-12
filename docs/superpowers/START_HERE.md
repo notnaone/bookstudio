@@ -35,22 +35,21 @@ If pytest doesn't show that, STOP and ask before changing anything.
 1. docs/superpowers/AGENT_HANDOFF.md
 2. docs/superpowers/specs/2026-06-12-studio-app-design.md
 3. docs/superpowers/plans/2026-06-12-studio-app-roadmap.md
-4. docs/superpowers/progress/2026-06-12-phase-4.md   (last completed phase ledger)
-5. docs/superpowers/plans/2026-06-12-studio-app-roadmap.md (Phase 5 scope)
+4. docs/superpowers/progress/2026-06-12-phase-5.md   (active phase ledger)
+5. docs/superpowers/plans/2026-06-12-phase-5-schedule-calendar.md
 
 Do NOT read every file under studio_app/ end-to-end yet. Read on demand.
 
 ## Step 4 — Pick up where the previous session stopped
 
-Phases 1–4 are shipped and merged to master. Phase 5 (Schedule & Calendar) is next.
+Phases 1–4 are shipped on master. Phase 5 (Schedule & Calendar) is in progress
+on branch phase-5-schedule-calendar.
 
 Follow the execution loop documented in AGENT_HANDOFF.md (section
 "The execution loop"):
 
-  - Create branch phase-5-schedule-calendar off master.
-  - Write the Phase 5 plan at
-    docs/superpowers/plans/2026-06-12-phase-5-schedule-calendar.md.
-  - Create a Phase 5 progress ledger.
+  - git checkout phase-5-schedule-calendar
+  - Read the Phase 5 plan + progress ledger (already in docs/superpowers/).
   - Dispatch Composer for Task 0 onward.
 
 ## Working conventions to keep
