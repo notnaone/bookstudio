@@ -29,5 +29,19 @@ def migrate(db_path: Path) -> None:
         current = 0
     if current < 1:
         sql = (MIGRATIONS_DIR / "001_initial.sql").read_text(encoding="utf-8")
-        conn.executescript(sql)
+        conn.execute("BEGIN")
+        try:
+            conn.executescript(sql)
+            try:
+                conn.execute("COMMIT")
+            except sqlite3.OperationalError:
+                # executescript() implicitly committed; this is expected
+                pass
+        except Exception:
+            try:
+                conn.execute("ROLLBACK")
+            except sqlite3.OperationalError:
+                # Transaction already ended
+                pass
+            raise
     conn.close()

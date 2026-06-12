@@ -44,7 +44,10 @@ CREATE TABLE book (
   FOREIGN KEY (narrator_id)  REFERENCES narrator(id)
 );
 
-CREATE TRIGGER book_touch AFTER UPDATE ON book BEGIN
+CREATE TRIGGER book_touch AFTER UPDATE ON book
+  FOR EACH ROW
+  WHEN NEW.updated_at IS OLD.updated_at
+BEGIN
   UPDATE book SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
