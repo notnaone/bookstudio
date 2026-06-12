@@ -19,3 +19,9 @@ async def test_setup_page_returns_html(client):
     r = await client.get("/setup")
     assert r.status_code == 200
     assert "<form" in r.text
+
+
+async def test_narrator_page_returns_html(client):
+    r = await client.get("/narrators/1")
+    assert r.status_code == 200
+    assert "<h1" in r.text

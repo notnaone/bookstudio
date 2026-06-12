@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 
 from studio_app.db import connect, migrate
 from studio_app.routes import books as books_routes
+from studio_app.routes import narrators as narrators_routes
+from studio_app.routes import publishers as publishers_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
 
@@ -32,6 +34,8 @@ def build_app(
     app.include_router(system_routes.router)
     app.include_router(books_routes.router)
     app.include_router(settings_routes.router)
+    app.include_router(publishers_routes.router)
+    app.include_router(narrators_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
@@ -54,6 +58,10 @@ def build_app(
     @app.get("/books/{book_id}", include_in_schema=False)
     def book_page(book_id: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "book.html")
+
+    @app.get("/narrators/{nid}", include_in_schema=False)
+    def narrator_page(nid: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "narrator.html")
 
     return app
 

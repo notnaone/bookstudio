@@ -10,19 +10,64 @@
   <a href="#" onclick="return false">Schedule</a>
 </header>
 <main>
-  <h1>Library</h1>
-  <form id="upload-form" class="row" enctype="multipart/form-data">
-    <input id="title" name="title" placeholder="Book title" required>
-    <input id="file" name="file" type="file" accept=".pdf,.epub,.docx,.txt" required>
-    <button class="primary" type="submit">Add book</button>
-    <span id="upload-status" class="muted"></span>
-  </form>
-  <table id="books-table">
-    <thead><tr>
-      <th>Title</th><th>Format</th><th>Pages</th><th>Body chars</th><th>Status</th>
-    </tr></thead>
-    <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-  </table>
+  <div class="tabs">
+    <button data-tab="books" class="active">Books</button>
+    <button data-tab="narrators">Narrators</button>
+    <button data-tab="publishers">Publishers</button>
+  </div>
+
+  <section class="tab-panel active" data-tab="books">
+    <div class="filters">
+      <input id="filter-q" placeholder="Search title…">
+      <select id="filter-status">
+        <option value="">Any status</option>
+        <option value="planned">Planned</option>
+        <option value="in_progress">In progress</option>
+        <option value="done">Done</option>
+        <option value="archived">Archived</option>
+      </select>
+      <select id="filter-narrator"><option value="">Any narrator</option></select>
+      <select id="filter-publisher"><option value="">Any publisher</option></select>
+    </div>
+    <form id="upload-form" class="row" enctype="multipart/form-data">
+      <input id="title" name="title" placeholder="Book title" required>
+      <input id="file" name="file" type="file" accept=".pdf,.epub,.docx,.txt" required>
+      <button class="primary" type="submit">Add book</button>
+      <span id="upload-status" class="muted"></span>
+    </form>
+    <table id="books-table">
+      <thead><tr>
+        <th>Title</th><th>Format</th><th>Narrator</th><th>Status</th><th>Pages</th>
+      </tr></thead>
+      <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="tab-panel" data-tab="narrators">
+    <form id="narrator-create" class="row">
+      <input id="nc-name" placeholder="Name" required>
+      <input id="nc-alias" placeholder="Calendar alias (optional)">
+      <button class="primary" type="submit">Add narrator</button>
+      <span id="nc-status" class="muted"></span>
+    </form>
+    <table id="narrators-table">
+      <thead><tr><th>Name</th><th>Alias</th><th>Notes</th></tr></thead>
+      <tbody><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="tab-panel" data-tab="publishers">
+    <form id="publisher-create" class="row">
+      <input id="pc-name" placeholder="Name" required>
+      <input id="pc-notes" placeholder="Notes (optional)">
+      <button class="primary" type="submit">Add publisher</button>
+      <span id="pc-status" class="muted"></span>
+    </form>
+    <table id="publishers-table">
+      <thead><tr><th>Name</th><th>Notes</th></tr></thead>
+      <tbody><tr><td colspan="2" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </section>
 </main>
 <script src="/static/app.js"></script>
 <script>setupLibraryPage();</script>
