@@ -110,3 +110,50 @@ def test_scan_book_clears_rows_when_folder_disappears(conn, data_root, tmp_path)
     assert n == 0
     rows = conn.execute("SELECT COUNT(*) AS c FROM audio_file WHERE book_id=?", (bid,)).fetchone()
     assert rows["c"] == 0
+
+
+def test_recompute_book_stats_zero_when_no_audio(conn, data_root, tmp_path):
+    src = tmp_path / "x.txt"
+    src.write_text("hi")
+    bid = ingest_book(conn, data_root, src, title="Zero Audio")
+    recompute_stats(conn)
+    row = conn.execute("SELECT * FROM book_stats WHERE book_id=?", (bid,)).fetchone()
+    assert row is not None
+    assert row["total_audio_seconds"] == 0
+    assert row["chars_per_hour"] == 0
+
+
+def test_recompute_book_stats_computes_chars_per_hour(conn, data_root, tmp_path):
+    af = tmp_path / "audio"
+    af.mkdir()
+    shutil.copy(FIXTURES / "silence.mp3", af / "a.mp3")
+    bid = _insert_book_with_folder(conn, data_root, af)
+    scan_book(conn, bid)
+    recompute_stats(conn)
+    row = conn.execute("SELECT * FROM book_stats WHERE book_id=?", (bid,)).fetchone()
+    assert row["total_audio_seconds"] > 0
+    assert row["chars_per_hour"] > 0
+
+
+def test_recompute_narrator_stats(conn, data_root, tmp_path):
+    af = tmp_path / "audio"
+    af.mkdir()
+    shutil.copy(FIXTURES / "silence.mp3", af / "x.mp3")
+    bid = _insert_book_with_folder(conn, data_root, af)
+    conn.execute(
+        "INSERT INTO narrator (name, calendar_alias) VALUES (?, ?)",
+        ("Reader", None),
+    )
+    nid = conn.execute("SELECT id FROM narrator WHERE name='Reader'").fetchone()["id"]
+    conn.execute("UPDATE book SET narrator_id = ? WHERE id = ?", (nid, bid))
+    conn.execute(
+        "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)",
+        (nid, bid),
+    )
+    scan_book(conn, bid)
+    recompute_stats(conn)
+    row = conn.execute("SELECT * FROM narrator_stats WHERE narrator_id=?", (nid,)).fetchone()
+    assert row is not None
+    assert row["books_assigned"] == 1
+    assert row["total_audio_seconds"] > 0
+    assert row["avg_chars_per_hour"] > 0
