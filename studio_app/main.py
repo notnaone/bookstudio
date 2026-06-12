@@ -26,6 +26,7 @@ def build_app(
     conn: sqlite3.Connection,
     data_root: Path,
     local_state_dir: Path,
+    scanner=None,
 ) -> FastAPI:
     app = FastAPI(title="Studio App")
     app.state.conn = conn
@@ -63,6 +64,7 @@ def build_app(
     def narrator_page(nid: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "narrator.html")
 
+    app.state.scanner = scanner
     return app
 
 
@@ -81,7 +83,21 @@ def main() -> int:
     ).fetchone()
     data_root = Path(row["value"]) if row and row["value"] else local_state_dir / "tmp_data_root"
     data_root.mkdir(parents=True, exist_ok=True)
-    app = build_app(conn=conn, data_root=data_root, local_state_dir=local_state_dir)
+    from studio_app.audio_scanner import scan_all
+    from studio_app.background import AudioScanner
+
+    row = conn.execute(
+        "SELECT value FROM app_setting WHERE key='audio_scan_interval_seconds'"
+    ).fetchone()
+    interval = int(row["value"]) if row else 300
+    scanner = AudioScanner(conn, interval_seconds=interval, scan_fn=scan_all)
+    app = build_app(
+        conn=conn,
+        data_root=data_root,
+        local_state_dir=local_state_dir,
+        scanner=scanner,
+    )
+    scanner.start()
     url = "http://127.0.0.1:8765"
     print(f"Studio App running at {url}")
     try:
