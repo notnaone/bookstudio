@@ -23,11 +23,18 @@ def _read_duration(path: Path) -> float:
         return 0.0
 
 
+def _audio_file_count(conn: sqlite3.Connection, book_id: int) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM audio_file WHERE book_id = ?", (book_id,)
+    ).fetchone()
+    return int(row["c"])
+
+
 def scan_book(conn: sqlite3.Connection, book_id: int) -> int:
     """Scan one book's audio_folder. Returns count of files now in DB.
 
     Idempotent. Adds new files, refreshes durations for changed ones,
-    removes rows for files that have disappeared.
+    removes rows for files that have disappeared from an accessible folder.
     """
     row = conn.execute(
         "SELECT audio_folder FROM book WHERE id = ?", (book_id,)
@@ -36,17 +43,18 @@ def scan_book(conn: sqlite3.Connection, book_id: int) -> int:
         return 0
     folder = row["audio_folder"]
     if not folder:
+        conn.execute("DELETE FROM audio_file WHERE book_id = ?", (book_id,))
         return 0
     folder_path = Path(folder)
+    if not folder_path.is_dir():
+        logger.warning("audio folder missing for book %s: %s", book_id, folder)
+        return _audio_file_count(conn, book_id)
 
-    # Collect every audio file currently on disk.
     on_disk: dict[str, Path] = {}
-    if folder_path.is_dir():
-        for p in folder_path.iterdir():
-            if p.is_file() and p.suffix.lower() in AUDIO_SUFFIXES:
-                on_disk[str(p.resolve())] = p
+    for p in folder_path.iterdir():
+        if p.is_file() and p.suffix.lower() in AUDIO_SUFFIXES:
+            on_disk[str(p.resolve())] = p
 
-    # Existing DB rows.
     existing = {
         r["path"]: r
         for r in conn.execute(
@@ -56,30 +64,32 @@ def scan_book(conn: sqlite3.Connection, book_id: int) -> int:
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    # Delete rows whose files have disappeared.
     for old_path in set(existing) - set(on_disk):
-        conn.execute("DELETE FROM audio_file WHERE path = ?", (old_path,))
+        conn.execute(
+            "DELETE FROM audio_file WHERE book_id = ? AND path = ?",
+            (book_id, old_path),
+        )
 
-    # Insert or update remaining.
     for path_str, p in on_disk.items():
         stat = p.stat()
         mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(
             timespec="seconds"
         )
-        duration = _read_duration(p)
         if path_str in existing:
             old = existing[path_str]
             if (
-                old["mtime"] != mtime_iso
-                or float(old["duration_seconds"]) != duration
-                or int(old["size_bytes"]) != stat.st_size
+                old["mtime"] == mtime_iso
+                and int(old["size_bytes"]) == stat.st_size
             ):
-                conn.execute(
-                    "UPDATE audio_file SET duration_seconds = ?, size_bytes = ?,"
-                    " mtime = ?, scanned_at = ? WHERE path = ?",
-                    (duration, stat.st_size, mtime_iso, now, path_str),
-                )
+                continue
+            duration = _read_duration(p)
+            conn.execute(
+                "UPDATE audio_file SET duration_seconds = ?, size_bytes = ?,"
+                " mtime = ?, scanned_at = ? WHERE book_id = ? AND path = ?",
+                (duration, stat.st_size, mtime_iso, now, book_id, path_str),
+            )
         else:
+            duration = _read_duration(p)
             conn.execute(
                 "INSERT INTO audio_file (book_id, path, filename,"
                 " duration_seconds, size_bytes, mtime, scanned_at)"
@@ -87,10 +97,7 @@ def scan_book(conn: sqlite3.Connection, book_id: int) -> int:
                 (book_id, path_str, p.name, duration, stat.st_size, mtime_iso, now),
             )
 
-    count = conn.execute(
-        "SELECT COUNT(*) AS c FROM audio_file WHERE book_id = ?", (book_id,)
-    ).fetchone()["c"]
-    return int(count)
+    return _audio_file_count(conn, book_id)
 
 
 def recompute_stats(conn: sqlite3.Connection) -> None:
@@ -100,7 +107,6 @@ def recompute_stats(conn: sqlite3.Connection) -> None:
     """
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    # --- book_stats ---
     conn.execute("DELETE FROM book_stats")
     rows = conn.execute(
         """
@@ -128,7 +134,6 @@ def recompute_stats(conn: sqlite3.Connection) -> None:
             (r["id"], total, chars_per_h, pages_per_h, progress, now),
         )
 
-    # --- narrator_stats ---
     conn.execute("DELETE FROM narrator_stats")
     rows = conn.execute(
         """
@@ -137,10 +142,15 @@ def recompute_stats(conn: sqlite3.Connection) -> None:
                (SELECT COUNT(*) FROM narrator_book nb JOIN book b ON b.id = nb.book_id
                 WHERE nb.narrator_id = n.id AND b.status = 'done') AS done,
                COALESCE(SUM(bs.total_audio_seconds), 0) AS total_seconds,
-               COALESCE(SUM(b.body_chars), 0) AS total_chars,
-               COALESCE(SUM(b.pages), 0) AS total_pages
+               COALESCE(SUM(
+                   CASE WHEN COALESCE(bs.total_audio_seconds, 0) > 0
+                        THEN b.body_chars ELSE 0 END), 0) AS total_chars,
+               COALESCE(SUM(
+                   CASE WHEN COALESCE(bs.total_audio_seconds, 0) > 0
+                        THEN b.pages ELSE 0 END), 0) AS total_pages
         FROM narrator n
-        LEFT JOIN book b ON b.narrator_id = n.id
+        LEFT JOIN narrator_book nb ON nb.narrator_id = n.id
+        LEFT JOIN book b ON b.id = nb.book_id
         LEFT JOIN book_stats bs ON bs.book_id = b.id
         GROUP BY n.id
         """
