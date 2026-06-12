@@ -29,6 +29,7 @@ def ingest_book(
     publisher_id: int | None = None,
     audio_folder: str | None = None,
     is_draft: bool = False,
+    original_filename: str | None = None,
 ) -> int:
     """Copy `source_file` into the data_root, parse it, insert a book row.
 
@@ -46,7 +47,8 @@ def ingest_book(
     src_dir.mkdir(parents=True, exist_ok=True)
     view_dir.mkdir(parents=True, exist_ok=True)
 
-    dest = src_dir / source_file.name
+    saved_name = original_filename or source_file.name
+    dest = src_dir / saved_name
     shutil.copy2(source_file, dest)
 
     try:

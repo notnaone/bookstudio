@@ -65,3 +65,20 @@ def test_ingest_book_initial_status_planned(conn, data_root: Path, tmp_path: Pat
     row = conn.execute("SELECT status, current_page FROM book WHERE id=?", (book_id,)).fetchone()
     assert row["status"] == "planned"
     assert row["current_page"] == 1
+
+
+def test_ingest_book_uses_original_filename_when_provided(conn, data_root, tmp_path):
+    src = tmp_path / "tmp_random_xyz.txt"
+    shutil.copy(FIXTURES / "sample.txt", src)
+    book_id = ingest_book(
+        conn, data_root, src,
+        title="Renamed Book",
+        original_filename="OriginalPublisher Title.txt",
+    )
+    row = conn.execute("SELECT source_path FROM book WHERE id=?", (book_id,)).fetchone()
+    # The saved filename should reflect the publisher's name, not the temp name.
+    expected = data_root / "books" / "renamed-book" / "source" / "OriginalPublisher Title.txt"
+    assert row["source_path"] == str(expected)
+    assert expected.exists()
+    # The temp-name file should NOT exist under source/.
+    assert not (data_root / "books" / "renamed-book" / "source" / "tmp_random_xyz.txt").exists()

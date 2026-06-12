@@ -66,3 +66,18 @@ async def test_post_book_rejects_unsupported_format(client, tmp_path: Path):
 async def test_get_book_404(client):
     r = await client.get("/api/books/9999")
     assert r.status_code == 404
+
+
+async def test_post_book_preserves_original_filename(client, tmp_path: Path):
+    sample = tmp_path / "internal_tmp_path.txt"
+    shutil.copy(FIXTURES / "sample.txt", sample)
+    with sample.open("rb") as fh:
+        r = await client.post(
+            "/api/books",
+            files={"file": ("Publisher Sent This.txt", fh, "text/plain")},
+            data={"title": "Filename Check"},
+        )
+    assert r.status_code == 201
+    src_path = r.json()["source_path"]
+    assert src_path.endswith("Publisher Sent This.txt"), src_path
+    assert "internal_tmp_path" not in src_path
