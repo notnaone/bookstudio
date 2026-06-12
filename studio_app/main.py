@@ -92,6 +92,14 @@ def build_app(
     def narrator_page(nid: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "narrator.html")
 
+    @app.get("/live/{book_id}", include_in_schema=False)
+    def live_single(book_id: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "live.html")
+
+    @app.get("/live/{a}/{b}", include_in_schema=False)
+    def live_split(a: int, b: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "live.html")
+
     app.state.scanner = scanner
     app.state.reaper = reaper
     return app

@@ -36,3 +36,14 @@ async def test_heartbeat_includes_last_audio_scan_at_key(client):
 async def test_heartbeat_includes_last_reaper_run_at_key(client):
     r = await client.get("/api/heartbeat")
     assert "last_reaper_run_at" in r.json()
+
+
+async def test_live_page_returns_html(client):
+    r = await client.get("/live/1")
+    assert r.status_code == 200
+    assert "viewer-host" in r.text
+
+
+async def test_live_split_page_returns_html(client):
+    r = await client.get("/live/1/2")
+    assert r.status_code == 200
