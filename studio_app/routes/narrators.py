@@ -17,6 +17,47 @@ def _row(r) -> dict:
     }
 
 
+def _stats_for_narrator(conn, narrator_id: int) -> dict:
+    row = conn.execute(
+        "SELECT * FROM narrator_stats WHERE narrator_id = ?", (narrator_id,)
+    ).fetchone()
+    if row is None:
+        return {
+            "books_assigned": 0,
+            "books_done": 0,
+            "total_audio_seconds": 0,
+            "avg_chars_per_hour": 0,
+            "avg_pages_per_hour": 0,
+        }
+    return {
+        "books_assigned": row["books_assigned"],
+        "books_done": row["books_done"],
+        "total_audio_seconds": row["total_audio_seconds"],
+        "avg_chars_per_hour": row["avg_chars_per_hour"],
+        "avg_pages_per_hour": row["avg_pages_per_hour"],
+    }
+
+
+def _history_for_narrator(conn, narrator_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT nb.book_id, b.title, nb.assigned_at, nb.finished_at"
+        " FROM narrator_book nb"
+        " JOIN book b ON b.id = nb.book_id"
+        " WHERE nb.narrator_id = ?"
+        " ORDER BY nb.assigned_at DESC",
+        (narrator_id,),
+    ).fetchall()
+    return [
+        {
+            "book_id": r["book_id"],
+            "title": r["title"],
+            "assigned_at": r["assigned_at"],
+            "finished_at": r["finished_at"],
+        }
+        for r in rows
+    ]
+
+
 @router.get("/api/narrators")
 def list_narrators(request: Request) -> dict:
     conn = request.app.state.conn
@@ -30,7 +71,10 @@ def get_narrator(nid: int, request: Request) -> dict:
     row = conn.execute("SELECT * FROM narrator WHERE id = ?", (nid,)).fetchone()
     if row is None:
         raise HTTPException(404, "Narrator not found")
-    return _row(row)
+    body = _row(row)
+    body["stats"] = _stats_for_narrator(conn, nid)
+    body["history"] = _history_for_narrator(conn, nid)
+    return body
 
 
 @router.post("/api/narrators", status_code=201)

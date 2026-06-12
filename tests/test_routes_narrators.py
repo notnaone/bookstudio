@@ -77,3 +77,21 @@ async def test_patch_narrator_clears_alias_with_null(client):
     )
     assert r2.status_code == 200
     assert r2.json()["calendar_alias"] is None
+
+
+async def test_get_narrator_includes_stats_block(client):
+    r = await client.post("/api/narrators", json={"name": "Stats Narr"})
+    nid = r.json()["id"]
+    r2 = await client.get(f"/api/narrators/{nid}")
+    body = r2.json()
+    assert "stats" in body
+    assert body["stats"]["books_assigned"] == 0
+
+
+async def test_get_narrator_includes_history_array(client):
+    r = await client.post("/api/narrators", json={"name": "Hist Narr"})
+    nid = r.json()["id"]
+    r2 = await client.get(f"/api/narrators/{nid}")
+    body = r2.json()
+    assert "history" in body
+    assert body["history"] == []
