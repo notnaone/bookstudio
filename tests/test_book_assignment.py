@@ -51,6 +51,19 @@ async def test_reassigning_narrator_closes_previous_history(client, conn, tmp_pa
     assert bob["finished_at"] is None
 
 
+async def test_marking_book_done_sets_finished_at(client, conn, tmp_path: Path):
+    nid = (await client.post("/api/narrators", json={"name": "Done Narr"})).json()["id"]
+    bid = await _create_book(client, tmp_path)
+    await client.patch(f"/api/books/{bid}", json={"narrator_id": nid})
+    await client.patch(f"/api/books/{bid}", json={"status": "done"})
+
+    row = conn.execute(
+        "SELECT * FROM narrator_book WHERE book_id = ? AND narrator_id = ?",
+        (bid, nid),
+    ).fetchone()
+    assert row["finished_at"] is not None
+
+
 async def test_unassigning_narrator_closes_history(client, conn, tmp_path: Path):
     nid = (await client.post("/api/narrators", json={"name": "C"})).json()["id"]
     bid = await _create_book(client, tmp_path)

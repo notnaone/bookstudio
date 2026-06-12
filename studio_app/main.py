@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import threading
 import webbrowser
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -11,14 +13,26 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from studio_app.db import connect, migrate
+from studio_app.db_lock import hold
 from studio_app.routes import books as books_routes
 from studio_app.routes import narrators as narrators_routes
 from studio_app.routes import publishers as publishers_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
+from studio_app.settings import load as load_settings
 
 STATIC_DIR = Path(__file__).parent / "static"
 DEFAULT_LOCAL_STATE_DIR = Path.home() / "AppData" / "Roaming" / "StudioApp"
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    scanner = getattr(app.state, "scanner", None)
+    if scanner is not None:
+        scanner.start()
+    yield
+    if scanner is not None:
+        scanner.stop()
 
 
 def build_app(
@@ -27,11 +41,13 @@ def build_app(
     data_root: Path,
     local_state_dir: Path,
     scanner=None,
+    db_lock: threading.Lock | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Studio App")
+    app = FastAPI(title="Studio App", lifespan=_lifespan)
     app.state.conn = conn
     app.state.data_root = data_root
     app.state.local_state_dir = local_state_dir
+    app.state.db_lock = db_lock if db_lock is not None else threading.Lock()
     app.include_router(system_routes.router)
     app.include_router(books_routes.router)
     app.include_router(settings_routes.router)
@@ -83,21 +99,26 @@ def main() -> int:
     ).fetchone()
     data_root = Path(row["value"]) if row and row["value"] else local_state_dir / "tmp_data_root"
     data_root.mkdir(parents=True, exist_ok=True)
+
     from studio_app.audio_scanner import scan_all
     from studio_app.background import AudioScanner
 
-    row = conn.execute(
-        "SELECT value FROM app_setting WHERE key='audio_scan_interval_seconds'"
-    ).fetchone()
-    interval = int(row["value"]) if row else 300
-    scanner = AudioScanner(conn, interval_seconds=interval, scan_fn=scan_all)
+    db_lock = threading.Lock()
+    settings = load_settings(conn)
+    interval = settings.audio_scan_interval_seconds
+
+    def locked_scan_all(c: sqlite3.Connection) -> int:
+        with hold(db_lock):
+            return scan_all(c)
+
+    scanner = AudioScanner(conn, interval_seconds=interval, scan_fn=locked_scan_all)
     app = build_app(
         conn=conn,
         data_root=data_root,
         local_state_dir=local_state_dir,
         scanner=scanner,
+        db_lock=db_lock,
     )
-    scanner.start()
     url = "http://127.0.0.1:8765"
     print(f"Studio App running at {url}")
     try:

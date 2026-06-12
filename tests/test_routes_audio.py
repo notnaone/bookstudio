@@ -34,6 +34,16 @@ async def test_rescan_audio_with_no_folder_returns_zero(client, tmp_path):
     assert r.json() == {"book_id": bid, "audio_files": 0}
 
 
+async def test_patch_audio_folder_triggers_scan(client, tmp_path):
+    bid = await _upload(client, tmp_path)
+    af = tmp_path / "audio"
+    af.mkdir()
+    shutil.copy(FIXTURES / "silence.mp3", af / "ch.mp3")
+    await client.patch(f"/api/books/{bid}", json={"audio_folder": str(af)})
+    r = await client.get(f"/api/books/{bid}")
+    assert r.json()["stats"]["total_audio_seconds"] > 0
+
+
 async def test_rescan_audio_with_mp3_returns_count(client, tmp_path):
     bid = await _upload(client, tmp_path)
     af = tmp_path / "audio"
