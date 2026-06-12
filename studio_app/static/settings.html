@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Settings — Studio App</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head><body>
+<header>
+  <strong>Studio App</strong>
+  <a href="/library">Library</a>
+  <a href="/schedule">Schedule</a>
+  <a class="active" href="/settings">Settings</a>
+</header>
+<main>
+  <h1>Settings</h1>
+  <p class="muted">Paste private Google Calendar iCal URLs for each studio lane.</p>
+  <form id="settings-form" class="col">
+    <div class="field">
+      <label for="ics1">Studio 1 calendar URL</label>
+      <input id="ics1" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+    </div>
+    <div class="field">
+      <label for="ics2">Studio 2 calendar URL</label>
+      <input id="ics2" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+    </div>
+    <div class="row">
+      <button class="primary" type="submit">Save</button>
+      <button type="button" id="sync-now">Sync calendars now</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </form>
+</main>
+<script src="/static/app.js"></script>
+<script>setupSettingsPage();</script>
+</body></html>

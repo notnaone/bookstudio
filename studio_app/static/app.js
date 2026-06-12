@@ -276,6 +276,35 @@ function escapeHtml(s) {
   }[c]));
 }
 
+async function setupSettingsPage() {
+  const status = document.getElementById('status');
+  const settings = await jsonFetch('/api/settings');
+  document.getElementById('ics1').value = settings.ics_url_studio_1 || '';
+  document.getElementById('ics2').value = settings.ics_url_studio_2 || '';
+  document.getElementById('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    status.textContent = 'Saving…';
+    try {
+      await jsonFetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ics_url_studio_1: document.getElementById('ics1').value.trim(),
+          ics_url_studio_2: document.getElementById('ics2').value.trim(),
+        }),
+      });
+      status.textContent = 'Saved.';
+    } catch (err) { status.textContent = err.message; }
+  });
+  document.getElementById('sync-now').addEventListener('click', async () => {
+    status.textContent = 'Syncing…';
+    try {
+      const r = await jsonFetch('/api/schedule/refresh', { method: 'POST' });
+      status.textContent = `Synced at ${r.synced_at || 'now'}.`;
+    } catch (err) { status.textContent = err.message; }
+  });
+}
+
 async function setupNarratorPage() {
   const nid = location.pathname.split('/').pop();
   const n = await jsonFetch(`/api/narrators/${nid}`);
@@ -313,6 +342,18 @@ async function setupNarratorPage() {
     stats.avg_chars_per_hour > 0 ? Math.round(stats.avg_chars_per_hour).toLocaleString() : '—';
   document.getElementById('s-pph').textContent =
     stats.avg_pages_per_hour > 0 ? Math.round(stats.avg_pages_per_hour).toLocaleString() : '—';
+
+  const upcoming = n.upcoming_sessions || [];
+  const upcomingBody = document.querySelector('#upcoming-table tbody');
+  upcomingBody.innerHTML = upcoming.length
+    ? upcoming.map((s) => `
+      <tr>
+        <td>${s.start_time || '—'}</td>
+        <td>${escapeHtml(s.source)}</td>
+        <td>${escapeHtml(s.raw_title)}</td>
+        <td>${escapeHtml(s.action_status)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="muted">No upcoming sessions.</td></tr>';
 
   const history = n.history || [];
   const histBody = document.querySelector('#history-table tbody');

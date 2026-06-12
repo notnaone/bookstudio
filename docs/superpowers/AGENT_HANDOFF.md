@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–4 are shipped on `master`. Phase 5 (Schedule & Calendar) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–5 are shipped on `master`. Phase 6 (Sync & Backup) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
 
 ---
 
@@ -40,7 +40,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
     │   ├── 2026-06-12-phase-2-library-screens.md      # ✅ shipped
     │   ├── 2026-06-12-phase-3-audio-scanner.md        # ✅ shipped
     │   ├── 2026-06-12-phase-4-live-viewer.md          # ✅ shipped
-    │   └── (phases 5-7 to be written just-in-time per phase)
+    │   ├── 2026-06-12-phase-5-schedule-calendar.md    # ✅ shipped
+    │   └── (phases 6-7 to be written just-in-time per phase)
     └── progress/                                       # per-phase execution ledgers
 ```
 
@@ -50,7 +51,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 2 — Library Screens & CRUD:** Publishers + Narrators CRUD, `PATCH /api/books/:id` with status/genre/narrator/publisher/etc., draft-clear gate, `narrator_book` history wiring (SAVEPOINT-wrapped), library tabs UI with filters, narrator detail screen, editable book detail form.
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
 - **Phase 4 — Live Viewer:** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view, "Open in viewer" from book detail.
-- **Cumulative tests:** 132 passed + 2 skipped on `master`.
+- **Phase 5 — Schedule & Calendar:** ICS client + CalendarPoller, schedule CRUD, `/schedule` UI (list + lanes), start-session A/B/C resolution, JIT onboarding wizard, minimal settings for ICS URLs, narrator upcoming sessions, live viewer `?session_id=` resume.
+- **Cumulative tests:** 163 passed + 2 skipped on `master`.
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
@@ -61,8 +63,8 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–4 merged; 132 tests
-phase-5-schedule-calendar    branch to create for Phase 5
+master                       Phases 1–5 merged; 163 tests
+phase-6-sync-backup          branch to create for Phase 6
 ```
 
 Each phase = its own branch off `master`, merged with `--no-ff` after audit passes. Per-task commits land on the phase branch. Branch naming: `phase-N-<short-name>`.
@@ -142,16 +144,16 @@ You don't need to re-invoke these. The pattern is established.
 
 When blocked by platform limits, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent.
 
-Phase 5 (Schedule & Calendar) is next per the roadmap. Write the plan just-in-time on `phase-5-schedule-calendar`.
+Phase 6 (Sync & Backup) is next per the roadmap. Write the plan on `phase-6-sync-backup`.
 
 ## What to do right now
 
 If you are reading this in a fresh session:
 
 1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 132 passed + 2 skipped.
-3. Read `docs/superpowers/plans/2026-06-12-studio-app-roadmap.md` for Phase 5 scope.
-4. Create branch `phase-5-schedule-calendar`, write the Phase 5 plan + progress ledger.
+2. Confirm `uv run pytest -q` → 163 passed + 2 skipped.
+3. Read `docs/superpowers/plans/2026-06-12-phase-6-sync-backup.md` and create a Phase 6 progress ledger.
+4. Create branch `phase-6-sync-backup` off master.
 5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.

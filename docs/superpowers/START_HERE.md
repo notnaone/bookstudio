@@ -26,7 +26,7 @@ If you do, pull the latest master:
 
     uv sync --all-groups
     uv run pytest -q
-Expected: 132 passed + 2 skipped.
+Expected: 163 passed + 2 skipped.
 
 If pytest doesn't show that, STOP and ask before changing anything.
 
@@ -35,22 +35,20 @@ If pytest doesn't show that, STOP and ask before changing anything.
 1. docs/superpowers/AGENT_HANDOFF.md
 2. docs/superpowers/specs/2026-06-12-studio-app-design.md
 3. docs/superpowers/plans/2026-06-12-studio-app-roadmap.md
-4. docs/superpowers/progress/2026-06-12-phase-4.md   (last completed phase ledger)
-5. docs/superpowers/plans/2026-06-12-studio-app-roadmap.md (Phase 5 scope)
+4. docs/superpowers/progress/2026-06-12-phase-5.md   (last completed phase ledger)
+5. docs/superpowers/plans/2026-06-12-phase-6-sync-backup.md
 
 Do NOT read every file under studio_app/ end-to-end yet. Read on demand.
 
 ## Step 4 — Pick up where the previous session stopped
 
-Phases 1–4 are shipped and merged to master. Phase 5 (Schedule & Calendar) is next.
+Phases 1–5 are shipped on master. Phase 6 (Sync & Backup) is next.
 
 Follow the execution loop documented in AGENT_HANDOFF.md (section
 "The execution loop"):
 
-  - Create branch phase-5-schedule-calendar off master.
-  - Write the Phase 5 plan at
-    docs/superpowers/plans/2026-06-12-phase-5-schedule-calendar.md.
-  - Create a Phase 5 progress ledger.
+  - Create branch phase-6-sync-backup off master.
+  - Read the Phase 6 plan; create a progress ledger.
   - Dispatch Composer for Task 0 onward.
 
 ## Working conventions to keep
@@ -75,7 +73,7 @@ Follow the execution loop documented in AGENT_HANDOFF.md (section
 - Don't change book_analyzer/ — it's the existing dependency.
 - Don't commit to master directly; always merge from a phase branch.
 
-Now begin with Phase 5 planning (or Task 0 if the plan already exists).
+Now begin with Phase 6 (or Task 0 if the ledger already exists).
 ```
 
 ---
@@ -84,4 +82,4 @@ Now begin with Phase 5 planning (or Task 0 if the plan already exists).
 
 - Cloud agents: clone from GitHub, checkout `master`, run Step 2, then paste the block above.
 - The handoff doc is the source of truth. When in doubt, point the agent at `docs/superpowers/AGENT_HANDOFF.md`.
-- Current baseline on `master`: Phase 4 live viewer shipped (132 tests).
+- Current baseline on `master`: Phase 5 schedule & calendar shipped (163 tests).

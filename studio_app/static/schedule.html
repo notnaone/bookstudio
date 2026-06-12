@@ -1,0 +1,116 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Schedule — Studio App</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/schedule.css">
+</head><body>
+<header>
+  <strong>Studio App</strong>
+  <a href="/library">Library</a>
+  <a class="active" href="/schedule">Schedule</a>
+  <a href="/settings">Settings</a>
+</header>
+<main>
+  <div class="schedule-toolbar row">
+    <h1>Schedule</h1>
+    <div class="row">
+      <button type="button" id="view-list" class="active">List</button>
+      <button type="button" id="view-lanes">Lanes</button>
+      <button type="button" id="refresh-calendars">Refresh calendars</button>
+    </div>
+  </div>
+  <p id="schedule-status" class="muted"></p>
+
+  <section id="list-view" class="schedule-view active">
+    <table id="schedule-table">
+      <thead><tr>
+        <th>Start</th><th>Source</th><th>Kind</th><th>Title</th>
+        <th>Narrator</th><th>Book</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <section id="lanes-view" class="schedule-view">
+    <div class="lanes">
+      <div class="lane" data-source="studio_1"><h2>Studio 1</h2><div class="lane-items"></div></div>
+      <div class="lane" data-source="studio_2"><h2>Studio 2</h2><div class="lane-items"></div></div>
+      <div class="lane" data-source="manual"><h2>Manual</h2><div class="lane-items"></div></div>
+    </div>
+  </section>
+
+  <section class="manual-form col">
+    <h2>Add manual item</h2>
+    <form id="manual-form" class="col">
+      <div class="row">
+        <select id="m-kind" required>
+          <option value="recording">Recording</option>
+          <option value="editing">Editing</option>
+          <option value="deadline">Deadline</option>
+        </select>
+        <input id="m-title" placeholder="Title" required>
+        <input id="m-start" type="datetime-local" required>
+        <input id="m-end" type="datetime-local" required>
+        <button class="primary" type="submit">Add</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div id="modal-backdrop" class="modal-backdrop hidden">
+  <div class="modal" id="detail-modal">
+    <h3 id="modal-title">Schedule item</h3>
+    <div id="modal-body"></div>
+    <div class="row modal-actions">
+      <button type="button" id="modal-start">Start Session</button>
+      <button type="button" id="modal-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="picker-backdrop" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3>Choose book</h3>
+    <div id="book-picker"></div>
+    <button type="button" id="picker-cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="jit-backdrop" class="modal-backdrop hidden">
+  <div class="modal jit-modal">
+    <h3>Quick setup</h3>
+    <p class="muted" id="jit-event-title"></p>
+    <form id="jit-form" class="col" enctype="multipart/form-data">
+      <div class="field">
+        <label>Narrator</label>
+        <select id="jit-narrator"></select>
+      </div>
+      <div class="field hidden" id="jit-new-narrator-wrap">
+        <label>New narrator name</label>
+        <input id="jit-narrator-name">
+        <label><input type="checkbox" id="jit-link-alias"> Link future calendar events</label>
+        <input id="jit-alias" placeholder="Calendar alias (optional)">
+      </div>
+      <div class="field">
+        <label>Book title</label>
+        <input id="jit-title" required>
+      </div>
+      <div class="field">
+        <label>Source file</label>
+        <input id="jit-file" type="file" accept=".pdf,.epub,.docx,.txt" required>
+      </div>
+      <div class="field">
+        <label>Audio folder (optional)</label>
+        <input id="jit-audio">
+      </div>
+      <div class="row">
+        <button class="primary" type="submit">Launch live session</button>
+        <button type="button" id="jit-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/schedule.js"></script>
+</body></html>

@@ -95,3 +95,21 @@ async def test_get_narrator_includes_history_array(client):
     body = r2.json()
     assert "history" in body
     assert body["history"] == []
+
+
+async def test_get_narrator_includes_upcoming_sessions(client, conn):
+    r = await client.post(
+        "/api/narrators", json={"name": "Scheduled", "calendar_alias": "Sched"}
+    )
+    nid = r.json()["id"]
+    conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, start_time, end_time, raw_title, resolved_narrator_id)"
+        " VALUES ('manual', datetime('now', '+1 day'), datetime('now', '+2 day'),"
+        " 'Future block', ?)",
+        (nid,),
+    )
+    body = (await client.get(f"/api/narrators/{nid}")).json()
+    assert "upcoming_sessions" in body
+    assert len(body["upcoming_sessions"]) == 1
+    assert body["upcoming_sessions"][0]["raw_title"] == "Future block"

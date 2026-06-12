@@ -20,8 +20,11 @@ from studio_app.routes import marks as marks_routes
 from studio_app.routes import narrators as narrators_routes
 from studio_app.routes import sessions as sessions_routes
 from studio_app.routes import publishers as publishers_routes
+from studio_app.routes import schedule as schedule_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
+from studio_app.calendar_poller import CalendarPoller, poll_calendars
+from studio_app.ics_client import fetch_ics
 from studio_app.settings import load as load_settings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -32,11 +35,16 @@ DEFAULT_LOCAL_STATE_DIR = Path.home() / "AppData" / "Roaming" / "StudioApp"
 async def _lifespan(app: FastAPI):
     scanner = getattr(app.state, "scanner", None)
     reaper = getattr(app.state, "reaper", None)
+    calendar_poller = getattr(app.state, "calendar_poller", None)
     if scanner is not None:
         scanner.start()
     if reaper is not None:
         reaper.start()
+    if calendar_poller is not None:
+        calendar_poller.start()
     yield
+    if calendar_poller is not None:
+        calendar_poller.stop()
     if reaper is not None:
         reaper.stop()
     if scanner is not None:
@@ -50,6 +58,7 @@ def build_app(
     local_state_dir: Path,
     scanner=None,
     reaper=None,
+    calendar_poller=None,
     db_lock: threading.Lock | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Studio App", lifespan=_lifespan)
@@ -65,6 +74,7 @@ def build_app(
     app.include_router(settings_routes.router)
     app.include_router(publishers_routes.router)
     app.include_router(narrators_routes.router)
+    app.include_router(schedule_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
@@ -100,9 +110,26 @@ def build_app(
     def live_split(a: int, b: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "live.html")
 
+    @app.get("/schedule", include_in_schema=False)
+    def schedule_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "schedule.html")
+
+    @app.get("/settings", include_in_schema=False)
+    def settings_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "settings.html")
+
     app.state.scanner = scanner
     app.state.reaper = reaper
+    app.state.calendar_poller = calendar_poller
     return app
+
+
+def _calendar_urls_provider(conn: sqlite3.Connection) -> dict[str, str | None]:
+    settings = load_settings(conn)
+    return {
+        "studio_1": settings.ics_url_studio_1,
+        "studio_2": settings.ics_url_studio_2,
+    }
 
 
 def _resolve_local_state_dir() -> Path:
@@ -147,12 +174,29 @@ def main() -> int:
         interval_seconds=settings.reaper_interval_seconds,
         reap_fn=locked_reap,
     )
+
+    def locked_poll_once() -> None:
+        with hold(db_lock):
+            poll_calendars(
+                conn,
+                fetch_fn=fetch_ics,
+                urls=_calendar_urls_provider(conn),
+            )
+
+    calendar_poller = CalendarPoller(
+        conn,
+        interval_seconds=settings.calendar_poll_interval_seconds,
+        fetch_fn=fetch_ics,
+        urls_provider=_calendar_urls_provider,
+        poll_fn=locked_poll_once,
+    )
     app = build_app(
         conn=conn,
         data_root=data_root,
         local_state_dir=local_state_dir,
         scanner=scanner,
         reaper=reaper,
+        calendar_poller=calendar_poller,
         db_lock=db_lock,
     )
     url = "http://127.0.0.1:8765"
