@@ -7,6 +7,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from studio_app.db import connect, migrate
@@ -32,6 +33,26 @@ def build_app(
     app.include_router(books_routes.router)
     app.include_router(settings_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        row = conn.execute("SELECT value FROM app_setting WHERE key='data_root'").fetchone()
+        if row and row["value"]:
+            return RedirectResponse(url="/library")
+        return RedirectResponse(url="/setup")
+
+    @app.get("/setup", include_in_schema=False)
+    def setup_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "setup.html")
+
+    @app.get("/library", include_in_schema=False)
+    def library_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "library.html")
+
+    @app.get("/books/{book_id}", include_in_schema=False)
+    def book_page(book_id: int) -> FileResponse:
+        return FileResponse(STATIC_DIR / "book.html")
+
     return app
 
 

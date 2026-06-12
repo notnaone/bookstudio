@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Studio App — First Run</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head><body>
+<main>
+  <h1>Set up Studio App</h1>
+  <p class="muted">Pick a folder for all data. Put it inside a Google Drive Desktop synced folder for automatic backup.</p>
+  <form id="setup-form" class="col">
+    <div class="field">
+      <label for="data_root">Data root (absolute path)</label>
+      <input id="data_root" name="data_root" required placeholder="C:\Users\You\Google Drive\Studio">
+    </div>
+    <div><button class="primary" type="submit">Initialize</button></div>
+    <p id="err" class="muted"></p>
+  </form>
+</main>
+<script src="/static/app.js"></script>
+<script>setupSetupForm();</script>
+</body></html>
