@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–3 are shipped on `master`. Phase 4 (Live Viewer) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–4 are shipped on `master`. Phase 5 (Schedule & Calendar) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
 
 ---
 
@@ -39,8 +39,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
     │   ├── 2026-06-12-phase-1-foundation.md           # ✅ shipped
     │   ├── 2026-06-12-phase-2-library-screens.md      # ✅ shipped
     │   ├── 2026-06-12-phase-3-audio-scanner.md        # ✅ shipped
-    │   ├── 2026-06-12-phase-4-live-viewer.md          # ← NEXT (write just-in-time)
-    │   └── (phases 4-7 to be written just-in-time per phase)
+    │   ├── 2026-06-12-phase-4-live-viewer.md          # ✅ shipped
+    │   └── (phases 5-7 to be written just-in-time per phase)
     └── progress/                                       # per-phase execution ledgers
 ```
 
@@ -49,8 +49,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 1 — Foundation:** FastAPI on `127.0.0.1:8765`, SQLite (WAL, FK on), all 12 tables + indexes from the spec, first-run `/setup` wizard, book upload+ingest, minimal library page. End-to-end demo verified live.
 - **Phase 2 — Library Screens & CRUD:** Publishers + Narrators CRUD, `PATCH /api/books/:id` with status/genre/narrator/publisher/etc., draft-clear gate, `narrator_book` history wiring (SAVEPOINT-wrapped), library tabs UI with filters, narrator detail screen, editable book detail form.
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
-- **Phase 4 — Live Viewer (in progress on `phase-4-live-viewer`):** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view.
-- **Cumulative tests:** 105 passed + 2 skipped on `master`; 129 passed + 2 skipped on `phase-4-live-viewer` (Task 12 audit pending).
+- **Phase 4 — Live Viewer:** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view, "Open in viewer" from book detail.
+- **Cumulative tests:** 132 passed + 2 skipped on `master`.
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
@@ -61,8 +61,8 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–3 merged; 100 tests
-phase-4-live-viewer          branch to create for Phase 4
+master                       Phases 1–4 merged; 132 tests
+phase-5-schedule-calendar    branch to create for Phase 5
 ```
 
 Each phase = its own branch off `master`, merged with `--no-ff` after audit passes. Per-task commits land on the phase branch. Branch naming: `phase-N-<short-name>`.
@@ -142,17 +142,17 @@ You don't need to re-invoke these. The pattern is established.
 
 When blocked by platform limits, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent.
 
-After Phase 3 ships, the user will likely want Phases 4–7 planned + dispatched the same way. Phase 4 (Live Viewer + reading sessions) is the largest — split it into sub-phases if needed.
+Phase 5 (Schedule & Calendar) is next per the roadmap. Write the plan just-in-time on `phase-5-schedule-calendar`.
 
 ## What to do right now
 
 If you are reading this in a fresh session:
 
-1. `git fetch origin && git checkout phase-4-live-viewer && git pull`.
-2. Confirm `uv run pytest -q` → 105 passed + 2 skipped (baseline grows per task).
-3. Read `docs/superpowers/progress/2026-06-12-phase-4.md` for current task.
-4. Read `docs/superpowers/plans/2026-06-12-phase-4-live-viewer.md` from that task onward.
-5. Dispatch Composer for the next pending task; continue through Task 11, then Opus audit + merge.
+1. `git fetch origin && git checkout master && git pull`.
+2. Confirm `uv run pytest -q` → 132 passed + 2 skipped.
+3. Read `docs/superpowers/plans/2026-06-12-studio-app-roadmap.md` for Phase 5 scope.
+4. Create branch `phase-5-schedule-calendar`, write the Phase 5 plan + progress ledger.
+5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.
 
