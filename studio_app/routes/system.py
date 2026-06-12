@@ -12,9 +12,11 @@ def heartbeat(request: Request) -> dict:
         "SELECT COUNT(*) AS c FROM reading_session WHERE ended_at IS NULL"
     ).fetchone()
     scanner = getattr(request.app.state, "scanner", None)
+    reaper = getattr(request.app.state, "reaper", None)
     return {
         "active_sessions": int(row["c"]),
         "last_snapshot_at": None,
         "last_calendar_sync_at": None,
         "last_audio_scan_at": scanner.last_scan_at if scanner else None,
+        "last_reaper_run_at": reaper.last_run_at if reaper else None,
     }

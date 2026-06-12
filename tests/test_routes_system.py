@@ -31,3 +31,8 @@ async def test_heartbeat_includes_last_audio_scan_at_key(client):
     r = await client.get("/api/heartbeat")
     body = r.json()
     assert "last_audio_scan_at" in body
+
+
+async def test_heartbeat_includes_last_reaper_run_at_key(client):
+    r = await client.get("/api/heartbeat")
+    assert "last_reaper_run_at" in r.json()
