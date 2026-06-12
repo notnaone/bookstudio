@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 1 | Foundation & Book Ingest | FastAPI app boots, settings + first-run wizard, full schema migrated, parser-backed book upload + library list page | `2026-06-12-phase-1-foundation.md` |
 | 2 | Library Screens & CRUD | Library tabs (books / narrators / publishers), book detail screen, narrator detail screen, manual assignment | `2026-06-12-phase-2-library-screens.md` |
-| 3 | Audio Scanner & Stats | Audio folder scanning via mutagen, `book_stats` + `narrator_stats` recompute, background scheduler thread | tbd |
+| 3 | Audio Scanner & Stats | Audio folder scanning via mutagen, `book_stats` + `narrator_stats` recompute, background scheduler thread | `2026-06-12-phase-3-audio-scanner.md` |
 | 4 | Live Viewer | DOCX/TXT pagination, three viewer adapters (PDF / EPUB / HTML), reading_session lifecycle, heartbeat, reaper, marks, hotkeys, split view | tbd |
 | 5 | Schedule & Calendar | `schedule_item` CRUD for manual rows, ICS poller, two studio lanes, [Start Session] resolution, JIT onboarding wizard | tbd |
 | 6 | Sync & Backup | Snapshot job, marks.json mirror, cold-start recovery, sync status UI | tbd |
