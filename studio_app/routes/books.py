@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -160,26 +161,33 @@ async def patch_book(book_id: int, request: Request) -> dict:
     if not updates:
         return _book_row_to_dict(row)
 
-    # Maintain the narrator_book history when the narrator assignment changes.
-    new_narr = updates.get("narrator_id", row["narrator_id"])
-    old_narr = row["narrator_id"]
-    if "narrator_id" in updates and new_narr != old_narr:
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        if old_narr is not None:
-            conn.execute(
-                "UPDATE narrator_book SET finished_at = ?"
-                " WHERE book_id = ? AND narrator_id = ? AND finished_at IS NULL",
-                (now, book_id, old_narr),
-            )
-        if new_narr is not None:
-            conn.execute(
-                "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)"
-                " ON CONFLICT(narrator_id, book_id) DO UPDATE SET finished_at = NULL",
-                (new_narr, book_id),
-            )
-
-    cols = ", ".join(f"{k} = ?" for k in updates)
-    params = list(updates.values()) + [book_id]
-    conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
+    # Wrap history wiring + book UPDATE in a savepoint so a downstream FK
+    # violation (e.g. unknown publisher_id) cannot leave an orphan history row.
+    conn.execute("SAVEPOINT patch_book")
+    try:
+        new_narr = updates.get("narrator_id", row["narrator_id"])
+        old_narr = row["narrator_id"]
+        if "narrator_id" in updates and new_narr != old_narr:
+            now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            if old_narr is not None:
+                conn.execute(
+                    "UPDATE narrator_book SET finished_at = ?"
+                    " WHERE book_id = ? AND narrator_id = ? AND finished_at IS NULL",
+                    (now, book_id, old_narr),
+                )
+            if new_narr is not None:
+                conn.execute(
+                    "INSERT INTO narrator_book (narrator_id, book_id) VALUES (?, ?)"
+                    " ON CONFLICT(narrator_id, book_id) DO UPDATE SET finished_at = NULL",
+                    (new_narr, book_id),
+                )
+        cols = ", ".join(f"{k} = ?" for k in updates)
+        params = list(updates.values()) + [book_id]
+        conn.execute(f"UPDATE book SET {cols} WHERE id = ?", params)
+    except sqlite3.IntegrityError as exc:
+        conn.execute("ROLLBACK TO SAVEPOINT patch_book")
+        conn.execute("RELEASE SAVEPOINT patch_book")
+        raise HTTPException(400, f"Foreign key constraint failed: {exc}") from exc
+    conn.execute("RELEASE SAVEPOINT patch_book")
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     return _book_row_to_dict(row)

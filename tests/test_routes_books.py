@@ -181,6 +181,19 @@ async def test_list_books_filters_by_title_substring(client, tmp_path: Path):
     assert titles == ["Alpha Book"]
 
 
+async def test_patch_book_invalid_narrator_id_returns_400(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path, title="FK Check")
+    r = await client.patch(f"/api/books/{bid}", json={"narrator_id": 9999})
+    assert r.status_code == 400
+    assert "foreign key" in r.json()["detail"].lower()
+
+
+async def test_patch_book_invalid_publisher_id_returns_400(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path, title="FK Check P")
+    r = await client.patch(f"/api/books/{bid}", json={"publisher_id": 9999})
+    assert r.status_code == 400
+
+
 async def test_list_books_filters_by_narrator(client, tmp_path: Path):
     n = await client.post("/api/narrators", json={"name": "Filter Narr"})
     nid = n.json()["id"]
