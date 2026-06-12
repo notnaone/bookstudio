@@ -8,8 +8,7 @@ from fastapi.responses import FileResponse
 router = APIRouter()
 
 
-@router.get("/api/books/{book_id}/view/page-{page}.html")
-def get_view_page(book_id: int, page: int, request: Request) -> FileResponse:
+def _view_page_response(book_id: int, page: int, request: Request) -> FileResponse:
     conn = request.app.state.conn
     row = conn.execute("SELECT view_path FROM book WHERE id = ?", (book_id,)).fetchone()
     if row is None:
@@ -24,6 +23,16 @@ def get_view_page(book_id: int, page: int, request: Request) -> FileResponse:
     if not target.is_file():
         raise HTTPException(404, "Page not found")
     return FileResponse(target, media_type="text/html")
+
+
+@router.get("/api/books/{book_id}/view/page-{page}.html")
+def get_view_page(book_id: int, page: int, request: Request) -> FileResponse:
+    return _view_page_response(book_id, page, request)
+
+
+@router.head("/api/books/{book_id}/view/page-{page}.html")
+def head_view_page(book_id: int, page: int, request: Request) -> FileResponse:
+    return _view_page_response(book_id, page, request)
 
 
 @router.get("/api/books/{book_id}/view/source")

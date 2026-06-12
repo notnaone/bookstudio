@@ -86,6 +86,38 @@ async def test_heartbeat_on_closed_session_returns_409(
     assert r.status_code == 409
 
 
+async def test_heartbeat_after_reaper_close_does_not_update_row(
+    client, conn, tmp_path: Path
+):
+    book = await _upload_book(client, tmp_path)
+    r = await client.post(
+        "/api/reading_session",
+        json={"book_id": book["id"]},
+    )
+    session_id = r.json()["id"]
+    conn.execute(
+        "UPDATE reading_session SET ended_at = '2026-06-12T10:00:00+00:00',"
+        " auto_closed = 1, last_heartbeat_at = '2026-06-12T09:00:00+00:00'"
+        " WHERE id = ?",
+        (session_id,),
+    )
+
+    r = await client.patch(
+        f"/api/reading_session/{session_id}/heartbeat",
+        json={"tracked_progress_page": 99, "active_seconds_delta": 50},
+    )
+    assert r.status_code == 409
+
+    row = conn.execute(
+        "SELECT tracked_progress_page, active_seconds, last_heartbeat_at"
+        " FROM reading_session WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+    assert row["tracked_progress_page"] != 99
+    assert row["active_seconds"] != 50
+    assert row["last_heartbeat_at"] == "2026-06-12T09:00:00+00:00"
+
+
 async def test_end_session_idempotent(client, tmp_path: Path):
     book = await _upload_book(client, tmp_path)
     r = await client.post(

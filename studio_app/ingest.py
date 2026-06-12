@@ -78,19 +78,28 @@ def ingest_book(
         encoding="utf-8",
     )
 
+    paginated_page_count: int | None = None
     if parsed.format == "txt":
         text = dest.read_text(encoding="utf-8", errors="replace")
         cpp = parsed.chars_per_page or 1800
         pages = paginate_txt(text, cpp)
         write_pages_to_dir(view_dir, pages)
+        paginated_page_count = len(pages)
         view_path = str(view_dir)
     elif parsed.format == "docx":
         cpp = parsed.chars_per_page or 1800
         pages = paginate_docx(dest, cpp)
         write_pages_to_dir(view_dir, pages)
+        paginated_page_count = len(pages)
         view_path = str(view_dir)
     else:
         view_path = str(dest)  # pdf/epub: source file
+
+    total_pages = (
+        paginated_page_count
+        if paginated_page_count is not None
+        else (parsed.total_pages or 0)
+    )
 
     try:
         cur = conn.execute(
@@ -106,7 +115,7 @@ def ingest_book(
                 slug, title, publisher_id,
                 str(dest), view_path, parsed.format,
                 parsed.body_chars, parsed.raw_chars,
-                parsed.chars_per_page, parsed.total_pages or 0,
+                parsed.chars_per_page, total_pages,
                 parsed.total_images, parsed.total_tables + parsed.total_charts,
                 audio_folder, 1 if is_draft else 0,
             ),

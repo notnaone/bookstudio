@@ -208,10 +208,10 @@ async def test_list_books_filters_by_narrator(client, tmp_path: Path):
 async def test_patch_active_page_updates_current_page(client, tmp_path: Path):
     bid = await _create_test_book(client, tmp_path)
     r = await client.patch(
-        f"/api/books/{bid}/active_page", json={"tracked_progress_page": 5}
+        f"/api/books/{bid}/active_page", json={"tracked_progress_page": 1}
     )
     assert r.status_code == 200
-    assert r.json()["current_page"] == 5
+    assert r.json()["current_page"] == 1
 
 
 async def test_patch_active_page_404(client):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from studio_app.reaper import SessionReaper, reap_stale_sessions
 
 
@@ -34,6 +36,22 @@ def test_reap_closes_stale_session(conn):
     ).fetchone()
     assert row["ended_at"] is not None
     assert row["end_page"] == 12
+    assert row["auto_closed"] == 1
+
+
+def test_reap_closes_same_day_iso_heartbeat(conn):
+    stale = (
+        datetime.now(timezone.utc) - timedelta(seconds=400)
+    ).isoformat(timespec="seconds")
+    session_id = _insert_open_session(conn, last_heartbeat_at=stale)
+
+    reap_stale_sessions(conn, idle_timeout_seconds=300)
+
+    row = conn.execute(
+        "SELECT ended_at, auto_closed FROM reading_session WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+    assert row["ended_at"] is not None
     assert row["auto_closed"] == 1
 
 

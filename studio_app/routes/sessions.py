@@ -93,19 +93,19 @@ async def heartbeat(session_id: int, request: Request) -> dict:
     ).fetchone()
     if row is None:
         raise HTTPException(404, "Session not found")
-    if row["ended_at"] is not None:
-        raise HTTPException(409, "Session already ended")
 
     now = _utc_now()
     with hold(request.app.state.db_lock):
-        conn.execute(
+        cur = conn.execute(
             "UPDATE reading_session"
             " SET tracked_progress_page = ?,"
             " active_seconds = active_seconds + ?,"
             " last_heartbeat_at = ?"
-            " WHERE id = ?",
+            " WHERE id = ? AND ended_at IS NULL",
             (tracked_progress_page, active_seconds_delta, now, session_id),
         )
+        if cur.rowcount == 0:
+            raise HTTPException(409, "Session already ended")
         conn.execute(
             "UPDATE book SET current_page = ? WHERE id = ?",
             (tracked_progress_page, row["book_id"]),

@@ -21,7 +21,7 @@ def reap_stale_sessions(conn: sqlite3.Connection, idle_timeout_seconds: int) -> 
          WHERE ended_at IS NULL
            AND (
              last_heartbeat_at IS NULL
-             OR last_heartbeat_at < datetime('now', ?)
+             OR julianday(last_heartbeat_at) < julianday('now', ?)
            )
         """,
         (modifier,),

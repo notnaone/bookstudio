@@ -230,10 +230,12 @@ function formatPaceValue(pagesAdvanced, activeSeconds, unit, book) {
       return `${Math.round(pagesPerHour).toLocaleString()} p/h`;
     case 'chars_per_hour': {
       const cpp = book.chars_per_page || 0;
+      if (cpp <= 0) return '—';
       return `${Math.round(pagesPerHour * cpp).toLocaleString()} c/h`;
     }
     case 'words_per_hour': {
       const cpp = book.chars_per_page || 0;
+      if (cpp <= 0) return '—';
       return `${Math.round((pagesPerHour * cpp) / 5).toLocaleString()} w/h`;
     }
     case 'sec_per_100_pages':
@@ -283,6 +285,7 @@ class PaneController {
     this.pendingActiveDelta = 0;
     this.lastVisibleAt = null;
     this.heartbeatTimer = null;
+    this.sessionTimerInterval = null;
     this.sessionStartMs = Date.now();
     this.activePagePatchTimer = null;
     this.dragStart = null;
@@ -355,8 +358,10 @@ class PaneController {
   }
 
   startHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.sessionTimerInterval) clearInterval(this.sessionTimerInterval);
     this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), 10000);
-    setInterval(() => this.updateSessionTimer(), 1000);
+    this.sessionTimerInterval = setInterval(() => this.updateSessionTimer(), 1000);
   }
 
   async sendHeartbeat() {
@@ -663,6 +668,10 @@ class PaneController {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.sessionTimerInterval) {
+      clearInterval(this.sessionTimerInterval);
+      this.sessionTimerInterval = null;
     }
   }
 
