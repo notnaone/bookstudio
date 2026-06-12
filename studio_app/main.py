@@ -18,6 +18,7 @@ from studio_app.routes import books as books_routes
 from studio_app import viewer_routes
 from studio_app.routes import marks as marks_routes
 from studio_app.routes import narrators as narrators_routes
+from studio_app.routes import sessions as sessions_routes
 from studio_app.routes import publishers as publishers_routes
 from studio_app.routes import settings_routes
 from studio_app.routes import system as system_routes
@@ -53,6 +54,7 @@ def build_app(
     app.include_router(system_routes.router)
     app.include_router(books_routes.router)
     app.include_router(marks_routes.router)
+    app.include_router(sessions_routes.router)
     app.include_router(viewer_routes.router)
     app.include_router(settings_routes.router)
     app.include_router(publishers_routes.router)
