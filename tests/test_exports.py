@@ -88,6 +88,16 @@ def test_export_sessions_csv_includes_reading_and_work(conn):
     assert len(_parse_csv(reading_only)) == 2
 
 
+def test_export_books_csv_escapes_formula_injection(conn):
+    conn.execute(
+        "INSERT INTO book (slug, title, format, source_path, view_path)"
+        " VALUES ('evil', '=cmd|'' /C calc''!A0', 'txt', '/x', '/x')"
+    )
+    lines = list(export_books_csv(conn))
+    rows = _parse_csv(lines)
+    assert rows[1][2].startswith("'=")
+
+
 def test_export_audio_files_csv_filter_by_book(conn):
     b1 = conn.execute(
         "INSERT INTO book (slug, title, format, source_path, view_path)"

@@ -8,8 +8,18 @@ from typing import Iterator
 
 def _csv_line(row: list) -> str:
     buf = StringIO()
-    csv.writer(buf).writerow(row)
+    csv.writer(buf).writerow([_csv_safe(v) for v in row])
     return buf.getvalue()
+
+
+def _csv_safe(value: object) -> object:
+    if value is None or value == "":
+        return ""
+    if not isinstance(value, str):
+        return value
+    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
 
 
 def _date_clause(

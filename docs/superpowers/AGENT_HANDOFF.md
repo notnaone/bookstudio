@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–6 are shipped on `master`. Phase 7 (Reports & Polish) is next.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** All 7 phases shipped on `master` at v1.0.0.
 
 ---
 
@@ -52,8 +52,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
 - **Phase 4 — Live Viewer:** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view, "Open in viewer" from book detail.
 - **Phase 6 — Sync & Backup:** SnapshotJob (live → `data_root/studio.sqlite`), cold-start recovery from snapshot, `data_root.txt` pointer, library snapshot status indicator, `POST /api/snapshot`.
-- **Full codebase audit (2026-06-12):** Opus primary audit + Codex validation → 12 fixes (XSS escape, session dedupe, db_lock coverage, settings validation, live viewer session resume). Report: `docs/superpowers/audits/2026-06-12-full-codebase-audit-report.md`.
-- **Cumulative tests:** 184 passed + 2 skipped on `master` (post full-codebase audit hardening).
+- **Phase 7 — Reports & Polish:** CSV exports (stream + save), export cleanup, full settings page, marks.json restore, log rotation, wizard polish. Audit: `docs/superpowers/audits/2026-06-12-phase-7-audit-report.md`.
+- **Cumulative tests:** 198 passed + 2 skipped on `master` (Phase 7 complete, v1.0.0).
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
@@ -64,8 +64,7 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–6 merged; 178 tests
-phase-7-reports-polish       branch to create for Phase 7
+master                       All 7 phases merged; 198 tests; tag v1.0.0
 ```
 
 Each phase = its own branch off `master`, merged with `--no-ff` after audit passes. Per-task commits land on the phase branch. Branch naming: `phase-N-<short-name>`.
@@ -145,15 +144,13 @@ You don't need to re-invoke these. The pattern is established.
 
 When blocked by platform limits, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent.
 
-Phase 7 (Reports & Polish) is next per the roadmap.
+Phase 7 complete. v1.0.0 tagged on master.
 
 ## What to do right now
 
 1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 178 passed + 2 skipped.
-3. Read `docs/superpowers/plans/2026-06-12-phase-7-reports-polish.md`.
-4. Create branch `phase-7-reports-polish` and progress ledger.
-5. Dispatch Composer for Task 0 onward.
+2. Confirm `uv run pytest -q` → 198 passed + 2 skipped.
+3. Optional: PyInstaller bundle per phase-7 plan.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.
 

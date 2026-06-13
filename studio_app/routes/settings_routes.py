@@ -10,7 +10,12 @@ from studio_app.settings import load, save_key
 
 router = APIRouter()
 
-_PACE_UNITS = frozenset({"chars_per_hour", "pages_per_hour"})
+_PACE_UNITS = frozenset({
+    "chars_per_hour",
+    "pages_per_hour",
+    "words_per_hour",
+    "sec_per_100_pages",
+})
 _POSITIVE_INT_KEYS = frozenset({
     "snapshot_interval_seconds",
     "audio_scan_interval_seconds",

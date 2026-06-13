@@ -34,8 +34,11 @@ def _stream_with_optional_save(
 
     exports_dir = data_root / "exports"
     if not exports_dir.is_dir():
-        yield from rows
-        return
+        if save:
+            exports_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            yield from rows
+            return
 
     out_path = exports_dir / f"{scope}-{_utc_stamp()}.csv"
     with out_path.open("w", encoding="utf-8", newline="") as fh:
@@ -113,7 +116,7 @@ async def cleanup_exports(request: Request) -> dict:
     if not isinstance(payload, dict):
         raise HTTPException(400, "JSON object required")
     older_than_days = payload.get("older_than_days")
-    if not isinstance(older_than_days, int) or older_than_days < 0:
+    if type(older_than_days) is not int or older_than_days < 0:
         raise HTTPException(400, "older_than_days must be a non-negative integer")
 
     exports_dir = request.app.state.data_root / "exports"
@@ -124,6 +127,8 @@ async def cleanup_exports(request: Request) -> dict:
     deleted = 0
     for path in exports_dir.glob("*.csv"):
         try:
+            if not path.is_file():
+                continue
             if path.stat().st_mtime < cutoff:
                 path.unlink()
                 deleted += 1

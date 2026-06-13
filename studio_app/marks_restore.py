@@ -16,7 +16,7 @@ def restore_marks_from_disk(conn: sqlite3.Connection, data_root: Path) -> dict:
         return {"restored": 0, "skipped_existing": 0, "errors": []}
 
     for book_dir in sorted(books_dir.iterdir()):
-        if not book_dir.is_dir():
+        if not book_dir.is_dir() or book_dir.name.startswith("."):
             continue
         marks_path = book_dir / "marks.json"
         if not marks_path.is_file():
@@ -47,10 +47,10 @@ def restore_marks_from_disk(conn: sqlite3.Connection, data_root: Path) -> dict:
                 continue
             try:
                 page = int(item["page"])
-                x_pct = float(item["x_pct"])
-                y_pct = float(item["y_pct"])
-                w_pct = float(item["w_pct"])
-                h_pct = float(item["h_pct"])
+                x_pct = round(float(item["x_pct"]), 4)
+                y_pct = round(float(item["y_pct"]), 4)
+                w_pct = round(float(item["w_pct"]), 4)
+                h_pct = round(float(item["h_pct"]), 4)
             except (KeyError, TypeError, ValueError):
                 errors.append(f"{slug}: invalid mark coordinates")
                 continue
