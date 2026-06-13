@@ -1,6 +1,6 @@
 # Agent Handoff — Audiobook Studio App
 
-> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–5 are shipped on `master`. Phase 6 (Sync & Backup) is next. Continue the same workflow: dispatch Composer subagents per task and audit their work.
+> **Drop this entire file into a new chat session to pick up where the previous one left off.** Phases 1–6 are shipped on `master`. Phase 7 (Reports & Polish) is next.
 
 ---
 
@@ -63,8 +63,8 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–5 merged; 168 tests
-phase-6-sync-backup          branch to create for Phase 6
+master                       Phases 1–6 merged; 178 tests
+phase-7-reports-polish       branch to create for Phase 7
 ```
 
 Each phase = its own branch off `master`, merged with `--no-ff` after audit passes. Per-task commits land on the phase branch. Branch naming: `phase-N-<short-name>`.
@@ -144,17 +144,15 @@ You don't need to re-invoke these. The pattern is established.
 
 When blocked by platform limits, apply small surgical fixes inline (you, Opus) rather than dispatching another subagent.
 
-Phase 6 (Sync & Backup) is next per the roadmap. Write the plan on `phase-6-sync-backup`.
+Phase 7 (Reports & Polish) is next per the roadmap.
 
 ## What to do right now
 
-If you are reading this in a fresh session:
-
 1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 168 passed + 2 skipped.
-3. Read `docs/superpowers/plans/2026-06-12-phase-6-sync-backup.md` and create a Phase 6 progress ledger.
-4. Create branch `phase-6-sync-backup` off master.
-5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
+2. Confirm `uv run pytest -q` → 178 passed + 2 skipped.
+3. Read `docs/superpowers/plans/2026-06-12-phase-7-reports-polish.md`.
+4. Create branch `phase-7-reports-polish` and progress ledger.
+5. Dispatch Composer for Task 0 onward.
 
 See also `docs/superpowers/START_HERE.md` for a copy-paste cloud kickoff block.
 
