@@ -67,9 +67,7 @@ function renderList() {
   tbody.querySelectorAll('[data-start]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const id = Number(btn.dataset.start);
-      openItemModal(scheduleItems.find((i) => i.id === id));
-      startSession(id);
+      startSession(Number(btn.dataset.start));
     });
   });
   tbody.querySelectorAll('tr[data-id]').forEach((row) => {

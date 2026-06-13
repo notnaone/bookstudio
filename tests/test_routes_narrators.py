@@ -113,3 +113,30 @@ async def test_get_narrator_includes_upcoming_sessions(client, conn):
     assert "upcoming_sessions" in body
     assert len(body["upcoming_sessions"]) == 1
     assert body["upcoming_sessions"][0]["raw_title"] == "Future block"
+
+
+async def test_upcoming_sessions_excludes_past_same_day_events(client, conn):
+    r = await client.post("/api/narrators", json={"name": "Today Narr"})
+    nid = r.json()["id"]
+    past_today = conn.execute(
+        "SELECT strftime('%Y-%m-%dT%H:%M:%S+00:00', datetime('now', '-3 hours'))"
+    ).fetchone()[0]
+    future_today = conn.execute(
+        "SELECT strftime('%Y-%m-%dT%H:%M:%S+00:00', datetime('now', '+3 hours'))"
+    ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, start_time, end_time, raw_title, resolved_narrator_id)"
+        " VALUES ('manual', ?, datetime('now', '+4 hours'), 'Past today', ?)",
+        (past_today, nid),
+    )
+    conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, start_time, end_time, raw_title, resolved_narrator_id)"
+        " VALUES ('manual', ?, datetime('now', '+5 hours'), 'Later today', ?)",
+        (future_today, nid),
+    )
+    body = (await client.get(f"/api/narrators/{nid}")).json()
+    titles = [s["raw_title"] for s in body["upcoming_sessions"]]
+    assert "Later today" in titles
+    assert "Past today" not in titles

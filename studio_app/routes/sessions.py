@@ -49,34 +49,44 @@ async def create_reading_session(request: Request) -> dict:
     if not isinstance(book_id, int):
         raise HTTPException(400, "book_id must be an integer")
 
-    book = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
-    if book is None:
-        raise HTTPException(404, "Book not found")
-
     schedule_item_id = payload.get("schedule_item_id")
     if schedule_item_id is not None and not isinstance(schedule_item_id, int):
         raise HTTPException(400, "schedule_item_id must be an integer")
 
-    now = _utc_now()
-    start_page = book["current_page"]
-    cur = conn.execute(
-        "INSERT INTO reading_session"
-        " (book_id, narrator_id, started_at, start_page, tracked_progress_page,"
-        " last_heartbeat_at, ended_at, schedule_item_id)"
-        " VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
-        (
-            book_id,
-            book["narrator_id"],
-            now,
-            start_page,
-            start_page,
-            now,
-            schedule_item_id,
-        ),
-    )
-    row = conn.execute(
-        "SELECT * FROM reading_session WHERE id = ?", (cur.lastrowid,)
-    ).fetchone()
+    with hold(request.app.state.db_lock):
+        book = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+        if book is None:
+            raise HTTPException(404, "Book not found")
+
+        existing = conn.execute(
+            "SELECT * FROM reading_session"
+            " WHERE book_id = ? AND ended_at IS NULL"
+            " LIMIT 1",
+            (book_id,),
+        ).fetchone()
+        if existing is not None:
+            return _session_row_to_dict(existing)
+
+        now = _utc_now()
+        start_page = book["current_page"]
+        cur = conn.execute(
+            "INSERT INTO reading_session"
+            " (book_id, narrator_id, started_at, start_page, tracked_progress_page,"
+            " last_heartbeat_at, ended_at, schedule_item_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
+            (
+                book_id,
+                book["narrator_id"],
+                now,
+                start_page,
+                start_page,
+                now,
+                schedule_item_id,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM reading_session WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
     return _session_row_to_dict(row)
 
 

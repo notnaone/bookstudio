@@ -34,6 +34,16 @@ async def test_get_reading_session(client, tmp_path: Path):
     assert body["ended_at"] is None
 
 
+async def test_create_session_is_idempotent_for_open_book(client, tmp_path: Path):
+    book = await _upload_book(client, tmp_path)
+    book_id = book["id"]
+    first = await client.post("/api/reading_session", json={"book_id": book_id})
+    second = await client.post("/api/reading_session", json={"book_id": book_id})
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] == second.json()["id"]
+
+
 async def test_create_session_sets_start_page_from_book(
     client, conn, tmp_path: Path
 ):

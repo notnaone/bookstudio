@@ -42,7 +42,8 @@ def _upcoming_sessions(conn, narrator_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT id, source, start_time, end_time, raw_title, action_status"
         " FROM schedule_item"
-        " WHERE resolved_narrator_id = ? AND start_time > datetime('now')"
+        " WHERE resolved_narrator_id = ?"
+        " AND julianday(start_time) > julianday('now')"
         " ORDER BY start_time",
         (narrator_id,),
     ).fetchall()

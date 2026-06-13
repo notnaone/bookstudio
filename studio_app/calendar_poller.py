@@ -78,13 +78,15 @@ def sync_calendar_source(
             f"UPDATE schedule_item SET action_status = 'cancelled'"
             f" WHERE source = ?"
             f" AND google_event_id IS NOT NULL"
+            f" AND action_status = 'pending'"
             f" AND google_event_id NOT IN ({placeholders})",
             (source, *sorted(seen_uids)),
         )
     else:
         conn.execute(
             "UPDATE schedule_item SET action_status = 'cancelled'"
-            " WHERE source = ? AND google_event_id IS NOT NULL",
+            " WHERE source = ? AND google_event_id IS NOT NULL"
+            " AND action_status = 'pending'",
             (source,),
         )
 
@@ -130,13 +132,15 @@ class CalendarPoller:
         self.last_sync_at: str | None = None
 
     def poll_once(self) -> None:
-        poll = self._poll_fn or poll_calendars
-        poll(
-            self._conn,
-            fetch_fn=self._fetch_fn,
-            urls=self._urls_provider(self._conn),
-            sync_fn=self._sync_fn,
-        )
+        if self._poll_fn is not None:
+            self._poll_fn()
+        else:
+            poll_calendars(
+                self._conn,
+                fetch_fn=self._fetch_fn,
+                urls=self._urls_provider(self._conn),
+                sync_fn=self._sync_fn,
+            )
         self.last_sync_at = _utc_now()
 
     def start(self) -> None:

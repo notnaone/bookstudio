@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from studio_app.calendar_poller import CalendarPoller
+from studio_app.calendar_poller import CalendarPoller, poll_calendars
+from studio_app.db_lock import hold
 from studio_app.main import build_app
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -308,6 +309,63 @@ async def test_jit_onboard_creates_book_and_session(client, conn, tmp_path: Path
     book = conn.execute("SELECT is_draft, status FROM book WHERE id = ?", (body["book_id"],)).fetchone()
     assert book["is_draft"] == 1
     assert book["status"] == "in_progress"
+
+
+async def test_schedule_refresh_with_production_poll_fn(conn, data_root, local_state_dir):
+    """Regression for F-01: main.py passes a zero-arg poll_fn."""
+    conn.execute(
+        "INSERT INTO app_setting (key, value) VALUES ('data_root', ?),"
+        " ('ics_url_studio_1', 'http://test/ics')",
+        (str(data_root),),
+    )
+    db_lock = threading.Lock()
+
+    def locked_poll_once() -> None:
+        with hold(db_lock):
+            poll_calendars(
+                conn,
+                fetch_fn=lambda url: (FIXTURES / "sample.ics").read_bytes(),
+                urls={"studio_1": "http://test/ics", "studio_2": None},
+            )
+
+    poller = CalendarPoller(
+        conn,
+        interval_seconds=300,
+        fetch_fn=lambda url: (FIXTURES / "sample.ics").read_bytes(),
+        urls_provider=lambda c: {
+            "studio_1": "http://test/ics",
+            "studio_2": None,
+        },
+        poll_fn=locked_poll_once,
+    )
+    app = build_app(
+        conn=conn,
+        data_root=data_root,
+        local_state_dir=local_state_dir,
+        calendar_poller=poller,
+        db_lock=db_lock,
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post("/api/schedule/refresh")
+        assert r.status_code == 200, r.text
+        assert r.json()["synced_at"] is not None
+
+
+async def test_start_session_is_idempotent(client, conn):
+    narr = _seed_narrator(conn, "Chris", "Chris")
+    _seed_book(conn, narrator_id=narr, title="Chris Book")
+    item_id = await _seed_calendar_event(conn, title="Chris - Session")
+
+    first = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    second = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert first.json()["session_id"] == second.json()["session_id"]
+    count = conn.execute(
+        "SELECT COUNT(*) AS c FROM reading_session WHERE schedule_item_id = ?"
+        " AND ended_at IS NULL",
+        (item_id,),
+    ).fetchone()["c"]
+    assert count == 1
 
 
 async def test_schedule_and_settings_pages(client):
