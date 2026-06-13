@@ -63,7 +63,7 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–5 merged; 163 tests
+master                       Phases 1–5 merged; 168 tests
 phase-6-sync-backup          branch to create for Phase 6
 ```
 
@@ -151,7 +151,7 @@ Phase 6 (Sync & Backup) is next per the roadmap. Write the plan on `phase-6-sync
 If you are reading this in a fresh session:
 
 1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 163 passed + 2 skipped.
+2. Confirm `uv run pytest -q` → 168 passed + 2 skipped.
 3. Read `docs/superpowers/plans/2026-06-12-phase-6-sync-backup.md` and create a Phase 6 progress ledger.
 4. Create branch `phase-6-sync-backup` off master.
 5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
