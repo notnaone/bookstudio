@@ -36,6 +36,9 @@ async def _lifespan(app: FastAPI):
     scanner = getattr(app.state, "scanner", None)
     reaper = getattr(app.state, "reaper", None)
     calendar_poller = getattr(app.state, "calendar_poller", None)
+    snapshot_job = getattr(app.state, "snapshot_job", None)
+    if snapshot_job is not None:
+        snapshot_job.start()
     if scanner is not None:
         scanner.start()
     if reaper is not None:
@@ -49,6 +52,8 @@ async def _lifespan(app: FastAPI):
         reaper.stop()
     if scanner is not None:
         scanner.stop()
+    if snapshot_job is not None:
+        snapshot_job.stop()
 
 
 def build_app(
@@ -59,6 +64,7 @@ def build_app(
     scanner=None,
     reaper=None,
     calendar_poller=None,
+    snapshot_job=None,
     db_lock: threading.Lock | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Studio App", lifespan=_lifespan)
@@ -121,6 +127,7 @@ def build_app(
     app.state.scanner = scanner
     app.state.reaper = reaper
     app.state.calendar_poller = calendar_poller
+    app.state.snapshot_job = snapshot_job
     return app
 
 
@@ -137,20 +144,35 @@ def _resolve_local_state_dir() -> Path:
 
 
 def main() -> int:
+    from studio_app.recovery import (
+        maybe_restore_snapshot,
+        persist_data_root,
+        resolve_data_root,
+    )
+
     local_state_dir = _resolve_local_state_dir()
     local_state_dir.mkdir(parents=True, exist_ok=True)
     db_path = local_state_dir / "studio.live.sqlite"
+
+    data_root = resolve_data_root(local_state_dir, db_path)
+    snapshot_path = data_root / "studio.sqlite"
+    maybe_restore_snapshot(db_path, snapshot_path)
+
     migrate(db_path)
     conn = connect(db_path)
     row = conn.execute(
         "SELECT value FROM app_setting WHERE key='data_root'"
     ).fetchone()
-    data_root = Path(row["value"]) if row and row["value"] else local_state_dir / "tmp_data_root"
+    if row and row["value"]:
+        data_root = Path(row["value"])
     data_root.mkdir(parents=True, exist_ok=True)
+    persist_data_root(local_state_dir, data_root)
+    snapshot_path = data_root / "studio.sqlite"
 
     from studio_app.audio_scanner import scan_all
     from studio_app.background import AudioScanner
     from studio_app.reaper import SessionReaper, reap_stale_sessions
+    from studio_app.snapshot import SnapshotJob
 
     db_lock = threading.Lock()
     settings = load_settings(conn)
@@ -190,6 +212,11 @@ def main() -> int:
         urls_provider=_calendar_urls_provider,
         poll_fn=locked_poll_once,
     )
+    snapshot_job = SnapshotJob(
+        db_path,
+        snapshot_path,
+        interval_seconds=settings.snapshot_interval_seconds,
+    )
     app = build_app(
         conn=conn,
         data_root=data_root,
@@ -197,6 +224,7 @@ def main() -> int:
         scanner=scanner,
         reaper=reaper,
         calendar_poller=calendar_poller,
+        snapshot_job=snapshot_job,
         db_lock=db_lock,
     )
     url = "http://127.0.0.1:8765"

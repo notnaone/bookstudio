@@ -24,3 +24,8 @@ form .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12
 .tab-panel.active { display:block; }
 .filters { display:flex; gap:8px; align-items:center; margin-bottom:16px; }
 .filters input, .filters select { padding:6px 10px; }
+.snapshot-status { margin-left: auto; font-size: 0.9rem; }
+.snapshot-status.ok { color: #5bef8b; }
+.snapshot-status.warn { color: #e6c85b; }
+.snapshot-status.stale { color: #ef6b6b; }
+.snapshot-btn { margin-left: 8px; font-size: 0.85rem; padding: 4px 10px; }

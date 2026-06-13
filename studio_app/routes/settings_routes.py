@@ -49,4 +49,7 @@ async def setup(request: Request) -> dict:
     (new_root / "exports").mkdir(exist_ok=True)
     save_key(conn, "data_root", str(new_root))
     request.app.state.data_root = new_root
+    from studio_app.recovery import persist_data_root
+
+    persist_data_root(request.app.state.local_state_dir, new_root)
     return asdict(load(conn))
