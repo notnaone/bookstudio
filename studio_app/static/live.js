@@ -296,6 +296,7 @@ class PaneController {
     this.pageCounterEl = paneEl.querySelector('.page-counter');
     this.paceBadgeEl = paneEl.querySelector('.pace-badge');
     this.sessionTimerEl = paneEl.querySelector('.session-timer');
+    this.sessionIdEl = paneEl.querySelector('.session-id-label');
     this.statusEl = paneEl.querySelector('.pane-status');
     this.marksRail = paneEl.querySelector('.marks-rail');
     this.searchInput = paneEl.querySelector('.search-input');
@@ -349,6 +350,9 @@ class PaneController {
     this.startPage = session.start_page;
     this.trackedProgressPage = session.tracked_progress_page;
     this.activeSeconds = session.active_seconds || 0;
+    if (this.sessionIdEl) {
+      this.sessionIdEl.textContent = `#${this.sessionId}`;
+    }
   }
 
   startVisibilityTracking() {
@@ -665,6 +669,12 @@ class PaneController {
     if (e.key === 'm' || e.key === 'M') {
       e.preventDefault();
       this.createMarkAtCenter();
+      return true;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      this.searchInput.focus();
+      this.searchInput.select();
       return true;
     }
     return false;

@@ -1,4 +1,53 @@
-# Book Analyzer
+# Book Analyzer / BookStudio
+
+This repository contains two applications:
+
+1. **Book Analyzer** — desktop PySide6 GUI for narrators (legacy portable `.exe`)
+2. **BookStudio (`studio_app`)** — local FastAPI web app for the recording engineer
+
+---
+
+## BookStudio (studio app)
+
+Local audiobook studio manager: book catalog, live viewer, schedule (ICS), audio scanning, SQLite snapshot backup.
+
+### Install
+
+Requirements: Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync
+```
+
+### Run
+
+```bash
+uv run studio-app
+```
+
+Opens `http://127.0.0.1:8765`. First launch runs the `/setup` wizard to pick `data_root`.
+
+### Data locations
+
+| Path | Role |
+|------|------|
+| `~/AppData/Roaming/StudioApp/studio.live.sqlite` | Live WAL database (Windows default) |
+| `<data_root>/studio.sqlite` | Google Drive–synced snapshot |
+| `<data_root>/books/<slug>/` | Source, paginated view, `marks.json` |
+| `<data_root>/exports/` | Optional CSV copies when `?save=1` |
+| `<data_root>/app.log` | Rotating application log |
+
+Put `data_root` inside a Google Drive Desktop folder for automatic off-machine backup.
+
+### Tests
+
+```bash
+uv run pytest -q
+```
+
+---
+
+## Book Analyzer (desktop GUI)
 
 Desktop app for audiobook narrators. Parses a book (txt / docx / epub / pdf),
 tracks reading progress against recorded audio, and computes pacing per

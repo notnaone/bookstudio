@@ -17,6 +17,29 @@ async function setupSetupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data_root }),
       });
+      const patch = {};
+      const ics1 = document.getElementById('ics1').value.trim();
+      const ics2 = document.getElementById('ics2').value.trim();
+      if (ics1) patch.ics_url_studio_1 = ics1;
+      if (ics2) patch.ics_url_studio_2 = ics2;
+      if (Object.keys(patch).length) {
+        await jsonFetch('/api/settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+      }
+      const narratorName = document.getElementById('narrator_name').value.trim();
+      if (narratorName) {
+        await jsonFetch('/api/narrators', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: narratorName,
+            calendar_alias: document.getElementById('calendar_alias').value.trim() || null,
+          }),
+        });
+      }
       location.href = '/library';
     } catch (e) { err.textContent = e.message; }
   });
@@ -328,32 +351,7 @@ function escapeHtml(s) {
 }
 
 async function setupSettingsPage() {
-  const status = document.getElementById('status');
-  const settings = await jsonFetch('/api/settings');
-  document.getElementById('ics1').value = settings.ics_url_studio_1 || '';
-  document.getElementById('ics2').value = settings.ics_url_studio_2 || '';
-  document.getElementById('settings-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    status.textContent = 'Saving…';
-    try {
-      await jsonFetch('/api/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ics_url_studio_1: document.getElementById('ics1').value.trim(),
-          ics_url_studio_2: document.getElementById('ics2').value.trim(),
-        }),
-      });
-      status.textContent = 'Saved.';
-    } catch (err) { status.textContent = err.message; }
-  });
-  document.getElementById('sync-now').addEventListener('click', async () => {
-    status.textContent = 'Syncing…';
-    try {
-      const r = await jsonFetch('/api/schedule/refresh', { method: 'POST' });
-      status.textContent = `Synced at ${r.synced_at || 'now'}.`;
-    } catch (err) { status.textContent = err.message; }
-  });
+  /* settings page logic lives in settings.js */
 }
 
 async function setupNarratorPage() {

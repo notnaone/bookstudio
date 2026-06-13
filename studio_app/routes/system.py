@@ -4,6 +4,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
+from studio_app.db_lock import hold
+from studio_app.marks_restore import restore_marks_from_disk
+
 router = APIRouter()
 
 
@@ -28,6 +31,14 @@ def heartbeat(request: Request) -> dict:
         "last_audio_scan_at": scanner.last_scan_at if scanner else None,
         "last_reaper_run_at": reaper.last_run_at if reaper else None,
     }
+
+
+@router.post("/api/marks/restore")
+def restore_marks(request: Request) -> dict:
+    conn = request.app.state.conn
+    data_root: Path = request.app.state.data_root
+    with hold(request.app.state.db_lock):
+        return restore_marks_from_disk(conn, data_root)
 
 
 @router.post("/api/snapshot")

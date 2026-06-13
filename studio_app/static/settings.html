@@ -12,23 +12,91 @@
 </header>
 <main>
   <h1>Settings</h1>
-  <p class="muted">Paste private Google Calendar iCal URLs for each studio lane.</p>
-  <form id="settings-form" class="col">
-    <div class="field">
-      <label for="ics1">Studio 1 calendar URL</label>
-      <input id="ics1" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
-    </div>
-    <div class="field">
-      <label for="ics2">Studio 2 calendar URL</label>
-      <input id="ics2" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+
+  <section class="col">
+    <h2>Data &amp; paths</h2>
+    <form id="settings-form" class="col">
+      <div class="field">
+        <label for="data_root">Data root</label>
+        <input id="data_root" type="text" placeholder="C:\Users\You\Google Drive\Studio">
+        <p class="muted">Moving data_root requires restart.</p>
+      </div>
+      <div class="field">
+        <label for="ics1">Studio 1 calendar URL</label>
+        <input id="ics1" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+      </div>
+      <div class="field">
+        <label for="ics2">Studio 2 calendar URL</label>
+        <input id="ics2" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+      </div>
+      <div class="field">
+        <label for="pace_unit">Pace unit</label>
+        <select id="pace_unit">
+          <option value="chars_per_hour">Characters per hour</option>
+          <option value="pages_per_hour">Pages per hour</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="snapshot_interval">Snapshot interval (s)</label>
+          <input id="snapshot_interval" type="number" min="1">
+        </div>
+        <div class="field">
+          <label for="audio_scan_interval">Audio scan interval (s)</label>
+          <input id="audio_scan_interval" type="number" min="1">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="calendar_poll_interval">Calendar poll interval (s)</label>
+          <input id="calendar_poll_interval" type="number" min="1">
+        </div>
+        <div class="field">
+          <label for="reaper_interval">Reaper interval (s)</label>
+          <input id="reaper_interval" type="number" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label for="session_idle_timeout">Session idle timeout (s)</label>
+        <input id="session_idle_timeout" type="number" min="1">
+      </div>
+      <div class="row">
+        <button class="primary" type="submit">Save settings</button>
+        <button type="button" id="sync-now">Test calendar connection</button>
+        <span id="status" class="muted"></span>
+      </div>
+    </form>
+  </section>
+
+  <section class="col">
+    <h2>Maintenance</h2>
+    <div class="row">
+      <button type="button" id="snapshot-now">Snapshot now</button>
+      <span id="snapshot-status" class="muted"></span>
     </div>
     <div class="row">
-      <button class="primary" type="submit">Save</button>
-      <button type="button" id="sync-now">Sync calendars now</button>
-      <span id="status" class="muted"></span>
+      <label for="cleanup-days">Delete exports older than</label>
+      <input id="cleanup-days" type="number" min="0" value="30" style="width:5em">
+      <span>days</span>
+      <button type="button" id="cleanup-exports">Clean up exports</button>
+      <span id="cleanup-status" class="muted"></span>
     </div>
-  </form>
+    <div class="row">
+      <button type="button" id="restore-marks">Restore marks from JSON</button>
+      <span id="restore-status" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2>Exports</h2>
+    <p class="muted">Download CSV reports. Add <code>?save=1</code> via API to also write to data_root/exports/.</p>
+    <div class="row">
+      <a class="button" href="/api/export/books.csv">Download books.csv</a>
+      <a class="button" href="/api/export/sessions.csv">Download sessions.csv</a>
+      <a class="button" href="/api/export/audio_files.csv">Download audio_files.csv</a>
+    </div>
+  </section>
 </main>
 <script src="/static/app.js"></script>
-<script>setupSettingsPage();</script>
+<script src="/static/settings.js"></script>
 </body></html>
