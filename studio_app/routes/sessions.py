@@ -54,10 +54,6 @@ async def create_reading_session(request: Request) -> dict:
         raise HTTPException(400, "schedule_item_id must be an integer")
 
     with hold(request.app.state.db_lock):
-        book = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
-        if book is None:
-            raise HTTPException(404, "Book not found")
-
         existing = conn.execute(
             "SELECT * FROM reading_session"
             " WHERE book_id = ? AND ended_at IS NULL"
@@ -66,6 +62,20 @@ async def create_reading_session(request: Request) -> dict:
         ).fetchone()
         if existing is not None:
             return _session_row_to_dict(existing)
+
+        if schedule_item_id is not None:
+            existing_sched = conn.execute(
+                "SELECT * FROM reading_session"
+                " WHERE schedule_item_id = ? AND ended_at IS NULL"
+                " LIMIT 1",
+                (schedule_item_id,),
+            ).fetchone()
+            if existing_sched is not None:
+                return _session_row_to_dict(existing_sched)
+
+        book = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+        if book is None:
+            raise HTTPException(404, "Book not found")
 
         now = _utc_now()
         start_page = book["current_page"]
@@ -163,21 +173,22 @@ async def end_session(session_id: int, request: Request) -> dict:
         raise HTTPException(400, "end_page must be an integer")
 
     now = _utc_now()
-    if "active_seconds" in payload:
-        active_seconds = payload["active_seconds"]
-        if not isinstance(active_seconds, int):
-            raise HTTPException(400, "active_seconds must be an integer")
-        conn.execute(
-            "UPDATE reading_session"
-            " SET ended_at = ?, end_page = ?, active_seconds = ?"
-            " WHERE id = ?",
-            (now, end_page, active_seconds, session_id),
-        )
-    else:
-        conn.execute(
-            "UPDATE reading_session SET ended_at = ?, end_page = ? WHERE id = ?",
-            (now, end_page, session_id),
-        )
+    with hold(request.app.state.db_lock):
+        if "active_seconds" in payload:
+            active_seconds = payload["active_seconds"]
+            if not isinstance(active_seconds, int):
+                raise HTTPException(400, "active_seconds must be an integer")
+            conn.execute(
+                "UPDATE reading_session"
+                " SET ended_at = ?, end_page = ?, active_seconds = ?"
+                " WHERE id = ?",
+                (now, end_page, active_seconds, session_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE reading_session SET ended_at = ?, end_page = ? WHERE id = ?",
+                (now, end_page, session_id),
+            )
 
     row = conn.execute(
         "SELECT * FROM reading_session WHERE id = ?", (session_id,)

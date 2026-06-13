@@ -331,8 +331,12 @@ class PaneController {
     let session;
     if (existingId) {
       session = await jsonFetch(`/api/reading_session/${existingId}`);
-      if (session.ended_at) {
-        throw new Error('Session already ended');
+      if (session.ended_at || session.book_id !== this.book.id) {
+        session = await jsonFetch('/api/reading_session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: this.book.id }),
+        });
       }
     } else {
       session = await jsonFetch('/api/reading_session', {
@@ -378,7 +382,6 @@ class PaneController {
     if (this.sessionId == null) return;
     this.flushActiveDelta();
     const delta = this.pendingActiveDelta;
-    this.pendingActiveDelta = 0;
     try {
       const session = await jsonFetch(
         `/api/reading_session/${this.sessionId}/heartbeat`,
@@ -391,6 +394,7 @@ class PaneController {
           }),
         },
       );
+      this.pendingActiveDelta -= delta;
       this.activeSeconds = session.active_seconds;
       this.updatePaceBadge();
     } catch (e) {
@@ -409,6 +413,14 @@ class PaneController {
   }
 
   async continueNewSession() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('session_id');
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${qs ? `?${qs}` : ''}`,
+    );
     this.statusEl.textContent = '';
     await this.startSession();
     this.startHeartbeat();

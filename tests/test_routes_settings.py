@@ -34,3 +34,18 @@ async def test_post_setup_rejects_blank_data_root(client):
 async def test_patch_settings_rejects_unknown_key(client):
     r = await client.patch("/api/settings", json={"nope": "bar"})
     assert r.status_code == 400
+
+
+async def test_patch_settings_rejects_invalid_pace_unit(client):
+    r = await client.patch("/api/settings", json={"pace_unit": "invalid"})
+    assert r.status_code == 400
+
+
+async def test_patch_settings_rejects_non_positive_interval(client):
+    r = await client.patch("/api/settings", json={"snapshot_interval_seconds": 0})
+    assert r.status_code == 400
+
+
+async def test_patch_settings_rejects_non_integer_interval(client):
+    r = await client.patch("/api/settings", json={"reaper_interval_seconds": "abc"})
+    assert r.status_code == 400

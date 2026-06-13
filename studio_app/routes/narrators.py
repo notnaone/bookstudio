@@ -4,6 +4,8 @@ import sqlite3
 
 from fastapi import APIRouter, HTTPException, Request
 
+from studio_app.db_lock import hold
+
 router = APIRouter()
 
 
@@ -114,15 +116,16 @@ async def create_narrator(request: Request) -> dict:
         alias = alias.strip() or None
     notes = payload.get("notes")
     try:
-        cur = conn.execute(
-            "INSERT INTO narrator (name, calendar_alias, notes) VALUES (?, ?, ?)",
-            (name, alias, notes),
-        )
+        with hold(request.app.state.db_lock):
+            cur = conn.execute(
+                "INSERT INTO narrator (name, calendar_alias, notes) VALUES (?, ?, ?)",
+                (name, alias, notes),
+            )
+            row = conn.execute(
+                "SELECT * FROM narrator WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
     except sqlite3.IntegrityError as exc:
         raise HTTPException(400, f"calendar_alias must be unique: {exc}") from exc
-    row = conn.execute(
-        "SELECT * FROM narrator WHERE id = ?", (cur.lastrowid,)
-    ).fetchone()
     return _row(row)
 
 
@@ -153,11 +156,12 @@ async def patch_narrator(nid: int, request: Request) -> dict:
     if "notes" in payload:
         notes = payload["notes"]
     try:
-        conn.execute(
-            "UPDATE narrator SET name = ?, calendar_alias = ?, notes = ? WHERE id = ?",
-            (name, alias, notes, nid),
-        )
+        with hold(request.app.state.db_lock):
+            conn.execute(
+                "UPDATE narrator SET name = ?, calendar_alias = ?, notes = ? WHERE id = ?",
+                (name, alias, notes, nid),
+            )
+            row = conn.execute("SELECT * FROM narrator WHERE id = ?", (nid,)).fetchone()
     except sqlite3.IntegrityError as exc:
         raise HTTPException(400, f"calendar_alias must be unique: {exc}") from exc
-    row = conn.execute("SELECT * FROM narrator WHERE id = ?", (nid,)).fetchone()
     return _row(row)

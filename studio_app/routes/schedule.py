@@ -119,12 +119,13 @@ async def create_schedule_item(request: Request) -> dict:
     raw_title = payload["raw_title"]
     notes = payload.get("notes")
 
-    cur = conn.execute(
-        "INSERT INTO schedule_item"
-        " (source, google_event_id, start_time, end_time, raw_title, notes, kind)"
-        " VALUES ('manual', NULL, ?, ?, ?, ?, ?)",
-        (start_time, end_time, raw_title, notes, kind),
-    )
+    with hold(request.app.state.db_lock):
+        cur = conn.execute(
+            "INSERT INTO schedule_item"
+            " (source, google_event_id, start_time, end_time, raw_title, notes, kind)"
+            " VALUES ('manual', NULL, ?, ?, ?, ?, ?)",
+            (start_time, end_time, raw_title, notes, kind),
+        )
     row = _get_item(conn, cur.lastrowid)
     assert row is not None
     return _row_to_dict(row)
@@ -198,10 +199,11 @@ async def patch_schedule_item(item_id: int, request: Request) -> dict:
         raise HTTPException(400, "No valid fields to update")
 
     set_clause = ", ".join(f"{k} = ?" for k in updates)
-    conn.execute(
-        f"UPDATE schedule_item SET {set_clause} WHERE id = ?",
-        (*updates.values(), item_id),
-    )
+    with hold(request.app.state.db_lock):
+        conn.execute(
+            f"UPDATE schedule_item SET {set_clause} WHERE id = ?",
+            (*updates.values(), item_id),
+        )
     row = _get_item(conn, item_id)
     assert row is not None
     return _row_to_dict(row)
@@ -218,7 +220,8 @@ def delete_schedule_item(item_id: int, request: Request) -> None:
         raise HTTPException(404, "Schedule item not found")
     if row["google_event_id"] is not None:
         raise HTTPException(403, "Calendar-mirrored rows cannot be deleted")
-    conn.execute("DELETE FROM schedule_item WHERE id = ?", (item_id,))
+    with hold(request.app.state.db_lock):
+        conn.execute("DELETE FROM schedule_item WHERE id = ?", (item_id,))
 
 
 @router.post("/api/schedule/refresh")
@@ -271,6 +274,15 @@ def _assign_narrator_to_book(conn, book_id: int, narrator_id: int) -> None:
     )
 
 
+def _open_session_for_book(conn, book_id: int):
+    return conn.execute(
+        "SELECT id, book_id, schedule_item_id FROM reading_session"
+        " WHERE book_id = ? AND ended_at IS NULL"
+        " LIMIT 1",
+        (book_id,),
+    ).fetchone()
+
+
 def _open_session_for_schedule(conn, schedule_item_id: int):
     return conn.execute(
         "SELECT id, book_id FROM reading_session"
@@ -315,6 +327,21 @@ def _start_case_a(
             "session_id": int(existing["id"]),
             "book_id": int(existing["book_id"]),
         }
+    existing_book = _open_session_for_book(conn, book_id)
+    if existing_book is not None:
+        now = _utc_now()
+        conn.execute(
+            "UPDATE schedule_item"
+            " SET resolved_narrator_id = ?, resolved_book_id = ?,"
+            " resolved_at = ?, action_status = 'started'"
+            " WHERE id = ?",
+            (narrator_id, book_id, now, item_id),
+        )
+        return {
+            "mode": "A",
+            "session_id": int(existing_book["id"]),
+            "book_id": book_id,
+        }
     now = _utc_now()
     session_id = _insert_reading_session(conn, book_id, item_id)
     conn.execute(
@@ -345,7 +372,28 @@ async def start_session(item_id: int, request: Request) -> dict:
     if book_id is not None and not isinstance(book_id, int):
         raise HTTPException(400, "book_id must be an integer")
 
-    narrator_id = resolve_narrator_from_title(conn, row["raw_title"])
+    if row["resolved_book_id"] is not None:
+        resolved_book_id = int(row["resolved_book_id"])
+        resolved_narrator_id = row["resolved_narrator_id"]
+        if resolved_narrator_id is None:
+            book_row = conn.execute(
+                "SELECT narrator_id FROM book WHERE id = ?", (resolved_book_id,)
+            ).fetchone()
+            if book_row is None:
+                raise HTTPException(404, "Resolved book not found")
+            resolved_narrator_id = book_row["narrator_id"]
+        if resolved_narrator_id is None:
+            return {"mode": "C", "raw_title": row["raw_title"]}
+        with hold(request.app.state.db_lock):
+            return _start_case_a(
+                conn, item_id, int(resolved_narrator_id), resolved_book_id
+            )
+
+    narrator_id = (
+        int(row["resolved_narrator_id"])
+        if row["resolved_narrator_id"] is not None
+        else resolve_narrator_from_title(conn, row["raw_title"])
+    )
     if narrator_id is None:
         return {"mode": "C", "raw_title": row["raw_title"]}
 
@@ -401,19 +449,6 @@ async def jit_onboard(
         tmp_path = Path(tmp.name)
 
     try:
-        try:
-            book_id = ingest_book(
-                conn,
-                data_root,
-                tmp_path,
-                title=title.strip(),
-                audio_folder=audio_folder or None,
-                is_draft=True,
-                original_filename=file.filename or None,
-            )
-        except ValueError as exc:
-            raise HTTPException(400, f"Unsupported file: {exc}") from exc
-
         with hold(request.app.state.db_lock):
             existing = _open_session_for_schedule(conn, item_id)
             if existing is not None:
@@ -431,6 +466,19 @@ async def jit_onboard(
                     "book_id": book_id,
                     "narrator_id": narr_id,
                 }
+
+            try:
+                book_id = ingest_book(
+                    conn,
+                    data_root,
+                    tmp_path,
+                    title=title.strip(),
+                    audio_folder=audio_folder or None,
+                    is_draft=True,
+                    original_filename=file.filename or None,
+                )
+            except ValueError as exc:
+                raise HTTPException(400, f"Unsupported file: {exc}") from exc
 
             if narrator_id is not None:
                 narr = conn.execute(
@@ -472,14 +520,13 @@ async def jit_onboard(
                 " WHERE id = ?",
                 (resolved_narrator_id, book_id, now, item_id),
             )
+            return {
+                "session_id": session_id,
+                "book_id": book_id,
+                "narrator_id": resolved_narrator_id,
+            }
     finally:
         try:
             tmp_path.unlink()
         except (FileNotFoundError, PermissionError, OSError):
             pass
-
-    return {
-        "session_id": session_id,
-        "book_id": book_id,
-        "narrator_id": resolved_narrator_id,
-    }

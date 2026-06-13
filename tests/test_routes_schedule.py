@@ -368,6 +368,49 @@ async def test_start_session_is_idempotent(client, conn):
     assert count == 1
 
 
+async def test_start_session_reuses_open_session_from_direct_path(client, conn):
+    """Regression: schedule start must not duplicate an open session for the book."""
+    narr = _seed_narrator(conn, "Chris", "Chris")
+    book_id = _seed_book(conn, narrator_id=narr, title="Chris Book")
+    item_id = await _seed_calendar_event(conn, title="Chris - Session")
+
+    direct = await client.post("/api/reading_session", json={"book_id": book_id})
+    assert direct.status_code == 201
+    direct_id = direct.json()["id"]
+
+    sched = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert sched.status_code == 200
+    assert sched.json()["mode"] == "A"
+    assert sched.json()["session_id"] == direct_id
+    assert sched.json()["book_id"] == book_id
+
+    count = conn.execute(
+        "SELECT COUNT(*) AS c FROM reading_session WHERE book_id = ? AND ended_at IS NULL",
+        (book_id,),
+    ).fetchone()["c"]
+    assert count == 1
+
+
+async def test_start_session_honors_resolved_book_id(client, conn):
+    """Regression: manually resolved schedule item should start that book."""
+    narr = _seed_narrator(conn, "Alex", "Alex")
+    book_a = _seed_book(conn, narrator_id=narr, title="Book Alpha")
+    _seed_book(conn, narrator_id=narr, title="Book Beta")
+    item_id = await _seed_calendar_event(conn, title="Alex - Resolved")
+
+    conn.execute(
+        "UPDATE schedule_item SET resolved_narrator_id = ?, resolved_book_id = ?"
+        " WHERE id = ?",
+        (narr, book_a, item_id),
+    )
+
+    r = await client.post(f"/api/schedule/{item_id}/start_session", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "A"
+    assert body["book_id"] == book_a
+
+
 async def test_schedule_and_settings_pages(client):
     r = await client.get("/schedule")
     assert r.status_code == 200

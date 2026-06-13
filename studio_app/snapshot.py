@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from studio_app.db_lock import hold
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,11 +46,13 @@ class SnapshotJob:
         snapshot_path: Path,
         interval_seconds: int,
         snapshot_fn: Callable[[Path, Path], int] | None = None,
+        db_lock: threading.Lock | None = None,
     ):
         self._live_path = live_path
         self._snapshot_path = snapshot_path
         self._interval = interval_seconds
         self._snapshot_fn = snapshot_fn or snapshot_now
+        self._db_lock = db_lock
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self.last_snapshot_at: str | None = None
@@ -57,7 +61,11 @@ class SnapshotJob:
     def run_once(self) -> int:
         if not self._live_path.exists():
             return 0
-        nbytes = self._snapshot_fn(self._live_path, self._snapshot_path)
+        if self._db_lock is not None:
+            with hold(self._db_lock):
+                nbytes = self._snapshot_fn(self._live_path, self._snapshot_path)
+        else:
+            nbytes = self._snapshot_fn(self._live_path, self._snapshot_path)
         self.last_snapshot_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.last_snapshot_bytes = nbytes
         return nbytes
