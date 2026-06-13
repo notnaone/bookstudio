@@ -216,6 +216,7 @@ def main() -> int:
         db_path,
         snapshot_path,
         interval_seconds=settings.snapshot_interval_seconds,
+        db_lock=db_lock,
     )
     app = build_app(
         conn=conn,

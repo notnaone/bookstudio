@@ -48,3 +48,11 @@ def test_paginate_docx_fixture(tmp_path):
 def test_paginate_html_empty_returns_one_blank_page():
     pages = paginate_html_to_pages("", chars_per_page=100)
     assert len(pages) == 1
+
+
+def test_paginate_txt_escapes_html_in_paragraphs():
+    pages = paginate_txt("<script>alert(1)</script>\n\n<b>bold</b>", chars_per_page=500)
+    assert len(pages) == 1
+    assert "<script>" not in pages[0]
+    assert "&lt;script&gt;" in pages[0]
+    assert "<b>bold</b>" in pages[0] or "&lt;b&gt;" in pages[0]

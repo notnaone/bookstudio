@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
+from studio_app.db_lock import hold
+
 router = APIRouter()
 
 
@@ -26,12 +28,13 @@ async def create_publisher(request: Request) -> dict:
     if not name:
         raise HTTPException(400, "name must be non-empty")
     notes = payload.get("notes")
-    cur = conn.execute(
-        "INSERT INTO publisher (name, notes) VALUES (?, ?)", (name, notes)
-    )
-    row = conn.execute(
-        "SELECT * FROM publisher WHERE id = ?", (cur.lastrowid,)
-    ).fetchone()
+    with hold(request.app.state.db_lock):
+        cur = conn.execute(
+            "INSERT INTO publisher (name, notes) VALUES (?, ?)", (name, notes)
+        )
+        row = conn.execute(
+            "SELECT * FROM publisher WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
     return _row(row)
 
 
@@ -53,9 +56,10 @@ async def patch_publisher(pid: int, request: Request) -> dict:
         name = new_name
     if "notes" in payload:
         notes = payload["notes"]
-    conn.execute(
-        "UPDATE publisher SET name = ?, notes = ? WHERE id = ?",
-        (name, notes, pid),
-    )
-    row = conn.execute("SELECT * FROM publisher WHERE id = ?", (pid,)).fetchone()
+    with hold(request.app.state.db_lock):
+        conn.execute(
+            "UPDATE publisher SET name = ?, notes = ? WHERE id = ?",
+            (name, notes, pid),
+        )
+        row = conn.execute("SELECT * FROM publisher WHERE id = ?", (pid,)).fetchone()
     return _row(row)

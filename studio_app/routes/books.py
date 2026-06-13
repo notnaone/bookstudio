@@ -118,10 +118,11 @@ async def create_book(
         tmp_path = Path(tmp.name)
 
     try:
-        book_id = ingest_book(
-            conn, data_root, tmp_path, title=title,
-            original_filename=file.filename or None,
-        )
+        with hold(request.app.state.db_lock):
+            book_id = ingest_book(
+                conn, data_root, tmp_path, title=title,
+                original_filename=file.filename or None,
+            )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Unsupported file: {exc}") from exc
     finally:

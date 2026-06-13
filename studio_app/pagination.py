@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -72,7 +73,11 @@ def paginate_html_to_pages(
 
 def paginate_txt(text: str, chars_per_page: int) -> list[str]:
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    inner = "".join(f"<p>{p}</p>" for p in paragraphs) if paragraphs else ""
+    inner = (
+        "".join(f"<p>{html.escape(p)}</p>" for p in paragraphs)
+        if paragraphs
+        else ""
+    )
     return paginate_html_to_pages(inner, chars_per_page)
 
 

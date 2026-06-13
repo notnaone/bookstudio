@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
+from studio_app.db_lock import hold
+
 router = APIRouter()
 
 _PCT_FIELDS = ("x_pct", "y_pct", "w_pct", "h_pct")
@@ -107,22 +109,23 @@ async def create_mark(request: Request) -> dict:
     color = payload.get("color", _DEFAULT_COLOR)
     comment = payload.get("comment")
 
-    cur = conn.execute(
-        "INSERT INTO mark (book_id, page, x_pct, y_pct, w_pct, h_pct, color, comment)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            book_id,
-            page,
-            payload["x_pct"],
-            payload["y_pct"],
-            payload["w_pct"],
-            payload["h_pct"],
-            color,
-            comment,
-        ),
-    )
-    row = conn.execute("SELECT * FROM mark WHERE id = ?", (cur.lastrowid,)).fetchone()
-    _mirror_marks(conn, data_root, book_id)
+    with hold(request.app.state.db_lock):
+        cur = conn.execute(
+            "INSERT INTO mark (book_id, page, x_pct, y_pct, w_pct, h_pct, color, comment)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                book_id,
+                page,
+                payload["x_pct"],
+                payload["y_pct"],
+                payload["w_pct"],
+                payload["h_pct"],
+                color,
+                comment,
+            ),
+        )
+        row = conn.execute("SELECT * FROM mark WHERE id = ?", (cur.lastrowid,)).fetchone()
+        _mirror_marks(conn, data_root, book_id)
     return _mark_row_to_dict(row)
 
 
@@ -147,12 +150,13 @@ async def patch_mark(mark_id: int, request: Request) -> dict:
 
     color = payload.get("color", row["color"])
     comment = payload.get("comment", row["comment"])
-    conn.execute(
-        "UPDATE mark SET color = ?, comment = ? WHERE id = ?",
-        (color, comment, mark_id),
-    )
-    row = conn.execute("SELECT * FROM mark WHERE id = ?", (mark_id,)).fetchone()
-    _mirror_marks(conn, data_root, row["book_id"])
+    with hold(request.app.state.db_lock):
+        conn.execute(
+            "UPDATE mark SET color = ?, comment = ? WHERE id = ?",
+            (color, comment, mark_id),
+        )
+        row = conn.execute("SELECT * FROM mark WHERE id = ?", (mark_id,)).fetchone()
+        _mirror_marks(conn, data_root, row["book_id"])
     return _mark_row_to_dict(row)
 
 
@@ -165,6 +169,7 @@ def delete_mark(mark_id: int, request: Request) -> Response:
         raise HTTPException(404, "Mark not found")
 
     book_id = row["book_id"]
-    conn.execute("DELETE FROM mark WHERE id = ?", (mark_id,))
-    _mirror_marks(conn, data_root, book_id)
+    with hold(request.app.state.db_lock):
+        conn.execute("DELETE FROM mark WHERE id = ?", (mark_id,))
+        _mirror_marks(conn, data_root, book_id)
     return Response(status_code=204)

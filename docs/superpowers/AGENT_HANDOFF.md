@@ -52,7 +52,8 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
 - **Phase 4 — Live Viewer:** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view, "Open in viewer" from book detail.
 - **Phase 6 — Sync & Backup:** SnapshotJob (live → `data_root/studio.sqlite`), cold-start recovery from snapshot, `data_root.txt` pointer, library snapshot status indicator, `POST /api/snapshot`.
-- **Cumulative tests:** 178 passed + 2 skipped on `master`.
+- **Full codebase audit (2026-06-12):** Opus primary audit + Codex validation → 12 fixes (XSS escape, session dedupe, db_lock coverage, settings validation, live viewer session resume). Report: `docs/superpowers/audits/2026-06-12-full-codebase-audit-report.md`.
+- **Cumulative tests:** 184 passed + 2 skipped on `master` (post full-codebase audit hardening).
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
