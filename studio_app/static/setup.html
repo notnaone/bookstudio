@@ -12,6 +12,28 @@
       <label for="data_root">Data root (absolute path)</label>
       <input id="data_root" name="data_root" required placeholder="C:\Users\You\Google Drive\Studio">
     </div>
+    <fieldset>
+      <legend>Optional — calendar sync</legend>
+      <div class="field">
+        <label for="ics1">Studio 1 calendar URL</label>
+        <input id="ics1" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+      </div>
+      <div class="field">
+        <label for="ics2">Studio 2 calendar URL</label>
+        <input id="ics2" type="url" placeholder="https://calendar.google.com/calendar/ical/...">
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Optional — default narrator</legend>
+      <div class="field">
+        <label for="narrator_name">Narrator name</label>
+        <input id="narrator_name" placeholder="e.g. Chris">
+      </div>
+      <div class="field">
+        <label for="calendar_alias">Calendar alias (prefix in event titles)</label>
+        <input id="calendar_alias" placeholder="e.g. Chris">
+      </div>
+    </fieldset>
     <div><button class="primary" type="submit">Initialize</button></div>
     <p id="err" class="muted"></p>
   </form>

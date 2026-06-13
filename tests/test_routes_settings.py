@@ -36,6 +36,18 @@ async def test_patch_settings_rejects_unknown_key(client):
     assert r.status_code == 400
 
 
+async def test_patch_settings_accepts_all_pace_units(client):
+    for unit in (
+        "chars_per_hour",
+        "pages_per_hour",
+        "words_per_hour",
+        "sec_per_100_pages",
+    ):
+        r = await client.patch("/api/settings", json={"pace_unit": unit})
+        assert r.status_code == 200, r.text
+        assert r.json()["pace_unit"] == unit
+
+
 async def test_patch_settings_rejects_invalid_pace_unit(client):
     r = await client.patch("/api/settings", json={"pace_unit": "invalid"})
     assert r.status_code == 400
