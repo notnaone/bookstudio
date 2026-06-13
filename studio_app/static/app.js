@@ -42,6 +42,57 @@ async function setupLibraryPage() {
   document.getElementById('filter-publisher').addEventListener('change', refreshBooks);
   document.getElementById('narrator-create').addEventListener('submit', onCreateNarrator);
   document.getElementById('publisher-create').addEventListener('submit', onCreatePublisher);
+  setupSnapshotIndicator();
+}
+
+function formatSnapshotAge(iso) {
+  if (!iso) return 'never';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'unknown';
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins === 1) return '1 min ago';
+  return `${mins} min ago`;
+}
+
+function snapshotStatusClass(iso) {
+  if (!iso) return 'stale';
+  const mins = (Date.now() - new Date(iso).getTime()) / 60000;
+  if (mins < 10) return 'ok';
+  if (mins < 30) return 'warn';
+  return 'stale';
+}
+
+async function refreshSnapshotIndicator() {
+  const el = document.getElementById('snapshot-status');
+  if (!el) return;
+  try {
+    const hb = await jsonFetch('/api/heartbeat');
+    const at = hb.last_snapshot_at;
+    el.textContent = `Last snapshot: ${formatSnapshotAge(at)}`;
+    el.className = `muted snapshot-status ${snapshotStatusClass(at)}`;
+  } catch (_) {
+    el.textContent = 'Last snapshot: —';
+  }
+}
+
+function setupSnapshotIndicator() {
+  const btn = document.getElementById('snapshot-now');
+  if (!btn) return;
+  refreshSnapshotIndicator();
+  setInterval(refreshSnapshotIndicator, 30000);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      await jsonFetch('/api/snapshot', { method: 'POST' });
+      await refreshSnapshotIndicator();
+    } catch (e) {
+      const el = document.getElementById('snapshot-status');
+      if (el) el.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 async function refreshBooks() {

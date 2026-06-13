@@ -52,3 +52,23 @@ async def test_live_split_page_returns_html(client):
 async def test_heartbeat_includes_last_calendar_sync_at_key(client):
     r = await client.get("/api/heartbeat")
     assert "last_calendar_sync_at" in r.json()
+
+
+async def test_post_snapshot_creates_file(client, app, data_root):
+    from studio_app.snapshot import SnapshotJob
+
+    live_path = app.state.local_state_dir / "studio.live.sqlite"
+    app.state.snapshot_job = SnapshotJob(
+        live_path,
+        data_root / "studio.sqlite",
+        interval_seconds=300,
+    )
+    r = await client.post("/api/snapshot")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["bytes"] > 0
+    assert (data_root / "studio.sqlite").is_file()
+
+    hb = await client.get("/api/heartbeat")
+    assert hb.json()["last_snapshot_at"] is not None

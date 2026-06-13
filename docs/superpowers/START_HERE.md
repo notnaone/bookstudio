@@ -26,7 +26,7 @@ If you do, pull the latest master:
 
     uv sync --all-groups
     uv run pytest -q
-Expected: 168 passed + 2 skipped.
+Expected: 178 passed + 2 skipped.
 
 If pytest doesn't show that, STOP and ask before changing anything.
 
