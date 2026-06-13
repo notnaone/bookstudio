@@ -26,7 +26,7 @@ If you do, pull the latest master:
 
     uv sync --all-groups
     uv run pytest -q
-Expected: 163 passed + 2 skipped.
+Expected: 168 passed + 2 skipped.
 
 If pytest doesn't show that, STOP and ask before changing anything.
 
@@ -82,4 +82,4 @@ Now begin with Phase 6 (or Task 0 if the ledger already exists).
 
 - Cloud agents: clone from GitHub, checkout `master`, run Step 2, then paste the block above.
 - The handoff doc is the source of truth. When in doubt, point the agent at `docs/superpowers/AGENT_HANDOFF.md`.
-- Current baseline on `master`: Phase 5 schedule & calendar shipped (163 tests).
+- Current baseline on `master`: Phase 5 + audit hardening shipped (168 tests).

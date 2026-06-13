@@ -48,6 +48,23 @@ def test_sync_calendar_source_cancels_missing_uid(conn):
     assert christina["action_status"] == "pending"
 
 
+def test_sync_calendar_source_does_not_cancel_started_rows(conn):
+    events = parse_ics(FIXTURE.read_bytes())
+    sync_calendar_source(conn, "studio_1", events)
+    conn.execute(
+        "UPDATE schedule_item SET action_status = 'started' WHERE google_event_id = ?",
+        (CHRIS_UID,),
+    )
+
+    sync_calendar_source(conn, "studio_1", [])
+
+    chris = conn.execute(
+        "SELECT action_status FROM schedule_item WHERE google_event_id = ?",
+        (CHRIS_UID,),
+    ).fetchone()
+    assert chris["action_status"] == "started"
+
+
 def test_sync_calendar_source_leaves_manual_rows_untouched(conn):
     manual_id = conn.execute(
         "INSERT INTO schedule_item"

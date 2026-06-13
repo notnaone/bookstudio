@@ -228,8 +228,7 @@ def refresh_schedule(request: Request) -> dict:
     if poller is None:
         raise HTTPException(503, "Calendar poller not configured")
     before = conn.execute("SELECT COUNT(*) AS c FROM schedule_item").fetchone()["c"]
-    with hold(request.app.state.db_lock):
-        poller.poll_once()
+    poller.poll_once()
     after = conn.execute("SELECT COUNT(*) AS c FROM schedule_item").fetchone()["c"]
     return {
         "synced_at": poller.last_sync_at,
@@ -272,6 +271,15 @@ def _assign_narrator_to_book(conn, book_id: int, narrator_id: int) -> None:
     )
 
 
+def _open_session_for_schedule(conn, schedule_item_id: int):
+    return conn.execute(
+        "SELECT id, book_id FROM reading_session"
+        " WHERE schedule_item_id = ? AND ended_at IS NULL"
+        " LIMIT 1",
+        (schedule_item_id,),
+    ).fetchone()
+
+
 def _insert_reading_session(
     conn, book_id: int, schedule_item_id: int
 ) -> int:
@@ -300,6 +308,13 @@ def _insert_reading_session(
 def _start_case_a(
     conn, item_id: int, narrator_id: int, book_id: int
 ) -> dict:
+    existing = _open_session_for_schedule(conn, item_id)
+    if existing is not None:
+        return {
+            "mode": "A",
+            "session_id": int(existing["id"]),
+            "book_id": int(existing["book_id"]),
+        }
     now = _utc_now()
     session_id = _insert_reading_session(conn, book_id, item_id)
     conn.execute(
@@ -386,7 +401,37 @@ async def jit_onboard(
         tmp_path = Path(tmp.name)
 
     try:
+        try:
+            book_id = ingest_book(
+                conn,
+                data_root,
+                tmp_path,
+                title=title.strip(),
+                audio_folder=audio_folder or None,
+                is_draft=True,
+                original_filename=file.filename or None,
+            )
+        except ValueError as exc:
+            raise HTTPException(400, f"Unsupported file: {exc}") from exc
+
         with hold(request.app.state.db_lock):
+            existing = _open_session_for_schedule(conn, item_id)
+            if existing is not None:
+                book_id = int(existing["book_id"])
+                narr_row = conn.execute(
+                    "SELECT narrator_id FROM book WHERE id = ?", (book_id,)
+                ).fetchone()
+                narr_id = (
+                    int(narr_row["narrator_id"])
+                    if narr_row and narr_row["narrator_id"] is not None
+                    else None
+                )
+                return {
+                    "session_id": int(existing["id"]),
+                    "book_id": book_id,
+                    "narrator_id": narr_id,
+                }
+
             if narrator_id is not None:
                 narr = conn.execute(
                     "SELECT id FROM narrator WHERE id = ?", (narrator_id,)
@@ -412,19 +457,6 @@ async def jit_onboard(
                         400, f"calendar_alias must be unique: {exc}"
                     ) from exc
                 resolved_narrator_id = int(cur.lastrowid)
-
-            try:
-                book_id = ingest_book(
-                    conn,
-                    data_root,
-                    tmp_path,
-                    title=title.strip(),
-                    audio_folder=audio_folder or None,
-                    is_draft=True,
-                    original_filename=file.filename or None,
-                )
-            except ValueError as exc:
-                raise HTTPException(400, f"Unsupported file: {exc}") from exc
 
             _assign_narrator_to_book(conn, book_id, resolved_narrator_id)
             conn.execute(

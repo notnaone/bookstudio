@@ -52,7 +52,7 @@ C:\Users\Kasutaja\Desktop\Anton\book parser\
 - **Phase 3 — Audio Scanner & Stats:** Background `AudioScanner` thread, per-book folder scan via mutagen, `book_stats`/`narrator_stats` recompute, stats in book/narrator GET, `POST /rescan_audio`, UI stats panels + Re-scan button.
 - **Phase 4 — Live Viewer:** DOM-aware pagination, viewer routes, marks CRUD + JSON mirror, reading_session API, SessionReaper, live HTML/JS shell with PDF/EPUB/HTML adapters, hotkeys, split view, "Open in viewer" from book detail.
 - **Phase 5 — Schedule & Calendar:** ICS client + CalendarPoller, schedule CRUD, `/schedule` UI (list + lanes), start-session A/B/C resolution, JIT onboarding wizard, minimal settings for ICS URLs, narrator upcoming sessions, live viewer `?session_id=` resume.
-- **Cumulative tests:** 163 passed + 2 skipped on `master`.
+- **Cumulative tests:** 168 passed + 2 skipped on `master`.
 
 The two skipped tests are documented:
 1. SQLite migration rollback (Python `sqlite3.executescript` doesn't honor a single transaction across DDL).
@@ -63,7 +63,7 @@ Both behaviors are verifiable by code review of the relevant try/except blocks.
 ## Git layout
 
 ```
-master                       Phases 1–5 merged; 163 tests
+master                       Phases 1–5 merged; 168 tests
 phase-6-sync-backup          branch to create for Phase 6
 ```
 
@@ -151,7 +151,7 @@ Phase 6 (Sync & Backup) is next per the roadmap. Write the plan on `phase-6-sync
 If you are reading this in a fresh session:
 
 1. `git fetch origin && git checkout master && git pull`.
-2. Confirm `uv run pytest -q` → 163 passed + 2 skipped.
+2. Confirm `uv run pytest -q` → 168 passed + 2 skipped.
 3. Read `docs/superpowers/plans/2026-06-12-phase-6-sync-backup.md` and create a Phase 6 progress ledger.
 4. Create branch `phase-6-sync-backup` off master.
 5. Dispatch Composer for Task 0 onward; Opus audit + merge when all tasks pass.
