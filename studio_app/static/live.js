@@ -178,7 +178,10 @@ class EpubAdapter {
     });
     this.rendition.on('relocated', (loc) => {
       const idx = loc?.start?.index;
-      if (typeof idx === 'number') this.currentPage = idx + 1;
+      if (typeof idx === 'number') {
+        this.currentPage = idx + 1;
+        if (this.onPageChange) this.onPageChange();
+      }
     });
     await this.goToPage(this.currentPage);
   }
@@ -290,8 +293,10 @@ class PaneController {
     this.activePagePatchTimer = null;
     this.dragStart = null;
     this.dragPreview = null;
+    this.highlighterMode = false;
 
     this.viewerHost = paneEl.querySelector('.viewer-host');
+    this.highlighterToggle = paneEl.querySelector('.highlighter-mode');
     this.viewerPageEl = paneEl.querySelector('.viewer-page');
     this.pageCounterEl = paneEl.querySelector('.page-counter');
     this.paceBadgeEl = paneEl.querySelector('.pace-badge');
@@ -305,16 +310,46 @@ class PaneController {
     paneEl.addEventListener('mousedown', () => this.onFocus(this));
     paneEl.querySelector('.page-inc').addEventListener('click', () => this.adjustActivePage(1));
     paneEl.querySelector('.page-dec').addEventListener('click', () => this.adjustActivePage(-1));
+    paneEl.querySelector('.viewer-inc').addEventListener('click', () => this.adjustViewerPage(1));
+    paneEl.querySelector('.viewer-dec').addEventListener('click', () => this.adjustViewerPage(-1));
     paneEl.querySelector('.pane-close').addEventListener('click', () => this.close());
     this.paceBadgeEl.addEventListener('click', () => this.cyclePaceUnit());
     this.searchInput.addEventListener('input', () => this.renderMarksRail());
-    this.viewerHost.addEventListener('mousedown', (e) => this.onMarkDragStart(e));
+    this.highlighterToggle.addEventListener('change', () => this.setHighlighterMode(this.highlighterToggle.checked));
+    this.viewerHost.addEventListener('mousedown', (e) => this.onViewerMouseDown(e));
     this.viewerHost.addEventListener('mousemove', (e) => this.onMarkDragMove(e));
     this.viewerHost.addEventListener('mouseup', (e) => this.onMarkDragEnd(e));
+    this.viewerHost.addEventListener('wheel', (e) => this.onViewerWheel(e), { passive: false });
+  }
+
+  setHighlighterMode(on) {
+    this.highlighterMode = on;
+    this.viewerHost.classList.toggle('highlighter-active', on);
+    if (!on && this.dragPreview) {
+      this.dragPreview.remove();
+      this.dragPreview = null;
+      this.dragStart = null;
+    }
+  }
+
+  onViewerMouseDown(e) {
+    if (!this.highlighterMode) return;
+    this.onMarkDragStart(e);
+  }
+
+  onViewerWheel(e) {
+    if (this.highlighterMode || shouldIgnoreHotkey(e)) return;
+    if (Math.abs(e.deltaY) < 8) return;
+    e.preventDefault();
+    this.adjustViewerPage(e.deltaY > 0 ? 1 : -1);
   }
 
   async init() {
     this.titleEl.textContent = this.book.title;
+    this.adapter.onPageChange = () => {
+      this.updateViewerPageUI();
+      this.renderMarkOverlays();
+    };
     await this.adapter.init(this.viewerHost, this.book);
     const { marks } = await jsonFetch(`/api/books/${this.book.id}/marks`);
     this.marks = marks;
@@ -453,6 +488,14 @@ class PaneController {
     this.updatePaceBadge();
   }
 
+  async adjustViewerPage(delta) {
+    const total = this.adapter.getTotalPages();
+    const current = this.adapter.getCurrentViewerPage();
+    const next = Math.min(Math.max(1, current + delta), total);
+    if (next === current) return;
+    await this.goToViewerPage(next);
+  }
+
   scheduleActivePagePatch() {
     clearTimeout(this.activePagePatchTimer);
     this.activePagePatchTimer = setTimeout(() => this.patchActivePage(), 500);
@@ -564,6 +607,7 @@ class PaneController {
   }
 
   onMarkDragStart(e) {
+    if (!this.highlighterMode) return;
     if (e.button !== 0 || e.target.classList.contains('mark-overlay')) return;
     this.onFocus(this);
     const rect = this.viewerHost.getBoundingClientRect();
@@ -578,7 +622,7 @@ class PaneController {
   }
 
   onMarkDragMove(e) {
-    if (!this.dragStart || !this.dragPreview) return;
+    if (!this.highlighterMode || !this.dragStart || !this.dragPreview) return;
     const rect = this.viewerHost.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -595,7 +639,7 @@ class PaneController {
   }
 
   async onMarkDragEnd(e) {
-    if (!this.dragStart || !this.dragPreview) return;
+    if (!this.highlighterMode || !this.dragStart || !this.dragPreview) return;
     const rect = this.viewerHost.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -656,6 +700,22 @@ class PaneController {
 
   handleHotkey(e) {
     if (shouldIgnoreHotkey(e)) return false;
+    if (e.key === 'h' || e.key === 'H') {
+      e.preventDefault();
+      this.setHighlighterMode(!this.highlighterMode);
+      this.highlighterToggle.checked = this.highlighterMode;
+      return true;
+    }
+    if (!this.highlighterMode && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      this.adjustViewerPage(1);
+      return true;
+    }
+    if (!this.highlighterMode && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      this.adjustViewerPage(-1);
+      return true;
+    }
     if (e.key === ']' || e.key === 'PageDown') {
       e.preventDefault();
       this.adjustActivePage(1);
@@ -666,7 +726,7 @@ class PaneController {
       this.adjustActivePage(-1);
       return true;
     }
-    if (e.key === 'm' || e.key === 'M') {
+    if (this.highlighterMode && (e.key === 'm' || e.key === 'M')) {
       e.preventDefault();
       this.createMarkAtCenter();
       return true;

@@ -5,10 +5,13 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from pydantic import BaseModel, Field
 
 from studio_app.db_lock import hold
 from studio_app.ingest import ingest_book
+from studio_app.source_fetch import download_source
 
 router = APIRouter()
 
@@ -122,6 +125,46 @@ async def create_book(
             book_id = ingest_book(
                 conn, data_root, tmp_path, title=title,
                 original_filename=file.filename or None,
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Unsupported file: {exc}") from exc
+    finally:
+        try:
+            tmp_path.unlink()
+        except (FileNotFoundError, PermissionError, OSError):
+            pass
+
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    return _book_row_to_dict(row)
+
+
+class BookFromUrlBody(BaseModel):
+    url: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+
+
+@router.post("/api/books/from_url", status_code=201)
+async def create_book_from_url(request: Request, body: BookFromUrlBody) -> dict:
+    conn = request.app.state.conn
+    data_root: Path = request.app.state.data_root
+
+    try:
+        tmp_path = download_source(body.url)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except requests.HTTPError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Download failed: {exc}"
+        ) from exc
+
+    try:
+        with hold(request.app.state.db_lock):
+            book_id = ingest_book(
+                conn,
+                data_root,
+                tmp_path,
+                title=body.title.strip(),
+                original_filename=tmp_path.name,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Unsupported file: {exc}") from exc

@@ -191,14 +191,28 @@ function showBookPicker(itemId, books) {
 async function openJitWizard(itemId, rawTitle) {
   jitItemId = itemId;
   document.getElementById('jit-event-title').textContent = rawTitle || '';
-  document.getElementById('jit-title').value = rawTitle || '';
+  const { narrator_part: narrPart, book_part: bookPart } = parseCalendarTitle(rawTitle || '');
+  document.getElementById('jit-title').value = bookPart || rawTitle || '';
   const { narrators } = await jsonFetch('/api/narrators');
   const sel = document.getElementById('jit-narrator');
   sel.innerHTML = '<option value="">+ Create new narrator</option>'
     + narrators.map((n) => `<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('');
   document.getElementById('jit-new-narrator-wrap').classList.toggle('hidden', sel.value !== '');
-  document.getElementById('jit-narrator-name').value = rawTitle || '';
+  document.getElementById('jit-narrator-name').value = narrPart || rawTitle || '';
+  if (narrPart) {
+    document.getElementById('jit-alias').value = narrPart;
+    document.getElementById('jit-link-alias').checked = true;
+  }
   document.getElementById('jit-backdrop').classList.remove('hidden');
+}
+
+function parseCalendarTitle(rawTitle) {
+  const idx = rawTitle.indexOf(' - ');
+  if (idx === -1) return { narrator_part: null, book_part: null };
+  return {
+    narrator_part: rawTitle.slice(0, idx).trim() || null,
+    book_part: rawTitle.slice(idx + 3).trim() || null,
+  };
 }
 
 async function submitJitForm(e) {
@@ -219,8 +233,10 @@ async function submitJitForm(e) {
   const audio = document.getElementById('jit-audio').value.trim();
   if (audio) form.append('audio_folder', audio);
   const file = document.getElementById('jit-file').files[0];
-  if (!file) return;
-  form.append('file', file);
+  const url = document.getElementById('jit-url').value.trim();
+  if (!file && !url) return;
+  if (file) form.append('file', file);
+  if (url) form.append('source_url', url);
   const result = await jsonFetch(`/api/schedule/${jitItemId}/jit`, {
     method: 'POST',
     body: form,

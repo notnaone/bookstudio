@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -66,6 +67,26 @@ async def test_post_book_rejects_unsupported_format(client, tmp_path: Path):
 async def test_get_book_404(client):
     r = await client.get("/api/books/9999")
     assert r.status_code == 404
+
+
+@patch("studio_app.routes.books.download_source")
+async def test_post_book_from_url(mock_download, client, tmp_path: Path):
+    sample = tmp_path / "remote.txt"
+    shutil.copy(FIXTURES / "sample.txt", sample)
+    mock_download.return_value = sample
+
+    r = await client.post(
+        "/api/books/from_url",
+        json={
+            "title": "Drive Book",
+            "url": "https://drive.google.com/file/d/abc/view",
+        },
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["title"] == "Drive Book"
+    assert body["format"] == "txt"
+    mock_download.assert_called_once()
 
 
 async def test_post_book_preserves_original_filename(client, tmp_path: Path):

@@ -92,6 +92,28 @@ header {
   background: #fafafa;
 }
 
+.viewer-host.highlighter-active {
+  cursor: crosshair;
+}
+
+.viewer-host:not(.highlighter-active) .mark-overlay {
+  pointer-events: none;
+}
+
+.highlighter-toggle {
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.viewer-nav button {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
 .mark-overlay {
   position: absolute;
   pointer-events: none;

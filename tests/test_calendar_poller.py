@@ -11,6 +11,30 @@ CHRISTINA_UID = "evt-christina-bar@bookstudio.test"
 BOOKING_UID = "evt-studio-booking@bookstudio.test"
 
 
+def test_sync_calendar_source_auto_resolves_narrator_and_book(conn):
+    narr = conn.execute(
+        "INSERT INTO narrator (name, calendar_alias) VALUES ('Chris', 'Chris')"
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO book (slug, title, format, source_path, view_path, narrator_id, status)"
+        " VALUES ('foo', 'Foo', 'txt', '/x', '/x', ?, 'in_progress')",
+        (narr,),
+    )
+
+    events = parse_ics(FIXTURE.read_bytes())
+    sync_calendar_source(conn, "studio_1", events)
+
+    row = conn.execute(
+        "SELECT raw_title, resolved_narrator_id, resolved_book_id, resolved_at"
+        " FROM schedule_item WHERE google_event_id = ?",
+        (CHRIS_UID,),
+    ).fetchone()
+    assert row["raw_title"] == "Chris - Foo"
+    assert row["resolved_narrator_id"] == narr
+    assert row["resolved_book_id"] is not None
+    assert row["resolved_at"] is not None
+
+
 def test_sync_calendar_source_inserts_fixture_events(conn):
     events = parse_ics(FIXTURE.read_bytes())
     sync_calendar_source(conn, "studio_1", events)
