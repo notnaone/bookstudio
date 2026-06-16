@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from studio_app.ics_client import CalendarEvent, parse_ics
+from studio_app.schedule_resolve import auto_resolve_schedule_item
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def sync_calendar_source(
             (event.uid,),
         ).fetchone()
         if existing is None:
-            conn.execute(
+            cur = conn.execute(
                 "INSERT INTO schedule_item"
                 " (source, google_event_id, start_time, end_time, raw_title, notes,"
                 " last_synced_at, action_status)"
@@ -56,6 +57,7 @@ def sync_calendar_source(
                     now,
                 ),
             )
+            auto_resolve_schedule_item(conn, int(cur.lastrowid), event.summary)
         else:
             conn.execute(
                 "UPDATE schedule_item"
@@ -71,6 +73,7 @@ def sync_calendar_source(
                     existing["id"],
                 ),
             )
+            auto_resolve_schedule_item(conn, int(existing["id"]), event.summary)
 
     if seen_uids:
         placeholders = ", ".join("?" * len(seen_uids))

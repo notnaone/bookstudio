@@ -59,6 +59,7 @@ async function setupLibraryPage() {
 
   await Promise.all([refreshBooks(), refreshNarrators(), refreshPublishers()]);
   document.getElementById('upload-form').addEventListener('submit', onUploadBook);
+  document.getElementById('upload-url-btn').addEventListener('click', onUploadBookUrl);
   document.getElementById('filter-q').addEventListener('input', refreshBooks);
   document.getElementById('filter-status').addEventListener('change', refreshBooks);
   document.getElementById('filter-narrator').addEventListener('change', refreshBooks);
@@ -186,13 +187,39 @@ async function refreshPublishers() {
 async function onUploadBook(e) {
   e.preventDefault();
   const status = document.getElementById('upload-status');
+  const file = document.getElementById('file').files[0];
+  if (!file) {
+    status.textContent = 'Choose a file or use URL import below.';
+    return;
+  }
   status.textContent = 'Uploading…';
   const fd = new FormData();
   fd.append('title', document.getElementById('title').value);
-  fd.append('file', document.getElementById('file').files[0]);
+  fd.append('file', file);
   try {
     const r = await fetch('/api/books', { method: 'POST', body: fd });
     if (!r.ok) throw new Error(await r.text());
+    status.textContent = 'Done.';
+    document.getElementById('upload-form').reset();
+    await refreshBooks();
+  } catch (e) { status.textContent = e.message; }
+}
+
+async function onUploadBookUrl() {
+  const status = document.getElementById('upload-status');
+  const title = document.getElementById('title').value.trim();
+  const url = document.getElementById('source-url').value.trim();
+  if (!title || !url) {
+    status.textContent = 'Enter book title and URL.';
+    return;
+  }
+  status.textContent = 'Downloading…';
+  try {
+    await jsonFetch('/api/books/from_url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, url }),
+    });
     status.textContent = 'Done.';
     document.getElementById('upload-form').reset();
     await refreshBooks();

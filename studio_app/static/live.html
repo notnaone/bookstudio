@@ -12,7 +12,15 @@
     <div class="top-bar">
       <span class="pane-title"></span>
       <input type="search" class="search-input" placeholder="Search marks…" aria-label="Search marks">
+      <label class="highlighter-toggle" title="When on, drag to highlight. When off, scroll and navigate normally.">
+        <input type="checkbox" class="highlighter-mode">
+        Highlighter
+      </label>
       <span class="viewer-page"></span>
+      <span class="viewer-nav">
+        <button type="button" class="viewer-dec" aria-label="Previous viewer page">◀</button>
+        <button type="button" class="viewer-inc" aria-label="Next viewer page">▶</button>
+      </span>
       <span class="active-page">
         <button type="button" class="page-dec" aria-label="Previous page">−</button>
         <span class="page-counter"></span>

@@ -6,10 +6,13 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from studio_app.db_lock import hold
 from studio_app.ingest import ingest_book
+from studio_app.schedule_resolve import resolve_narrator_from_title
+from studio_app.source_fetch import download_source
 
 router = APIRouter()
 
@@ -239,18 +242,6 @@ def refresh_schedule(request: Request) -> dict:
     }
 
 
-def resolve_narrator_from_title(conn, raw_title: str) -> int | None:
-    row = conn.execute(
-        "SELECT id FROM narrator"
-        " WHERE calendar_alias IS NOT NULL"
-        " AND LOWER(?) LIKE LOWER(calendar_alias) || '%'"
-        " ORDER BY LENGTH(calendar_alias) DESC"
-        " LIMIT 1",
-        (raw_title,),
-    ).fetchone()
-    return int(row["id"]) if row else None
-
-
 def _candidate_books(conn, narrator_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT id, title FROM book"
@@ -422,7 +413,8 @@ async def start_session(item_id: int, request: Request) -> dict:
 async def jit_onboard(
     item_id: int,
     request: Request,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    source_url: str | None = Form(None),
     title: str = Form(...),
     narrator_id: int | None = Form(None),
     narrator_name: str | None = Form(None),
@@ -439,14 +431,33 @@ async def jit_onboard(
     if narrator_id is None and not (narrator_name or "").strip():
         raise HTTPException(400, "narrator_id or narrator_name is required")
 
-    suffix = Path(file.filename or "").suffix or ""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        while True:
-            chunk = await file.read(65536)
-            if not chunk:
-                break
-            tmp.write(chunk)
-        tmp_path = Path(tmp.name)
+    url = (source_url or "").strip()
+    if file is None and not url:
+        raise HTTPException(400, "file or source_url is required")
+    if file is not None and url:
+        raise HTTPException(400, "Provide either file or source_url, not both")
+
+    tmp_path: Path | None = None
+    if url:
+        try:
+            tmp_path = download_source(url)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except requests.HTTPError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Download failed: {exc}"
+            ) from exc
+    else:
+        suffix = Path(file.filename or "").suffix or ""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            while True:
+                chunk = await file.read(65536)
+                if not chunk:
+                    break
+                tmp.write(chunk)
+            tmp_path = Path(tmp.name)
+
+    original_filename = file.filename if file is not None else tmp_path.name
 
     try:
         with hold(request.app.state.db_lock):
@@ -475,7 +486,7 @@ async def jit_onboard(
                     title=title.strip(),
                     audio_folder=audio_folder or None,
                     is_draft=True,
-                    original_filename=file.filename or None,
+                    original_filename=original_filename,
                 )
             except ValueError as exc:
                 raise HTTPException(400, f"Unsupported file: {exc}") from exc
@@ -526,7 +537,8 @@ async def jit_onboard(
                 "narrator_id": resolved_narrator_id,
             }
     finally:
-        try:
-            tmp_path.unlink()
-        except (FileNotFoundError, PermissionError, OSError):
-            pass
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink()
+            except (FileNotFoundError, PermissionError, OSError):
+                pass

@@ -32,11 +32,17 @@
       <select id="filter-narrator"><option value="">Any narrator</option></select>
       <select id="filter-publisher"><option value="">Any publisher</option></select>
     </div>
-    <form id="upload-form" class="row" enctype="multipart/form-data">
-      <input id="title" name="title" placeholder="Book title" required>
-      <input id="file" name="file" type="file" accept=".pdf,.epub,.docx,.txt" required>
-      <button class="primary" type="submit">Add book</button>
-      <span id="upload-status" class="muted"></span>
+    <form id="upload-form" class="row col" enctype="multipart/form-data">
+      <div class="row">
+        <input id="title" name="title" placeholder="Book title" required>
+        <input id="file" name="file" type="file" accept=".pdf,.epub,.docx,.txt">
+        <button class="primary" type="submit">Add book (file)</button>
+      </div>
+      <div class="row">
+        <input id="source-url" placeholder="Google Drive or file URL (.pdf, .epub, .docx, .txt)">
+        <button type="button" id="upload-url-btn" class="primary">Add book (URL)</button>
+        <span id="upload-status" class="muted"></span>
+      </div>
     </form>
     <table id="books-table">
       <thead><tr>
