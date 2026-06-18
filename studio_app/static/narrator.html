@@ -1,15 +1,24 @@
 <!doctype html>
-<html><head>
+<html lang="en"><head>
 <meta charset="utf-8">
-<title>Narrator — Studio App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Narrator — BookStudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css">
 </head><body>
-<header>
-  <strong>Studio App</strong>
-  <a href="/library">← Library</a>
-</header>
-<main>
-  <h1 id="name">Loading…</h1>
+<div class="lv-app">
+  <aside class="lv-sidebar" id="lv-sidebar"></aside>
+  <div class="lv-main">
+    <header class="lv-header">
+      <div class="lv-header-main">
+        <a class="lv-back" href="/library">← Library</a>
+        <h1 id="name">Loading…</h1>
+      </div>
+      <div class="lv-avatar">MK</div>
+    </header>
+    <div class="lv-content">
   <form id="narrator-form" class="col">
     <div class="field">
       <label>Name</label>
@@ -49,7 +58,9 @@
     <thead><tr><th>Book</th><th>Assigned</th><th>Finished</th></tr></thead>
     <tbody><tr><td colspan="3" class="muted">—</td></tr></tbody>
   </table>
-</main>
+    </div>
+  </div>
+</div>
 <script src="/static/app.js"></script>
-<script>setupNarratorPage();</script>
+<script>renderSidebar('narrators'); setupNarratorPage();</script>
 </body></html>

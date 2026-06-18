@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import sqlite3
 import tempfile
 from datetime import datetime, timezone
@@ -312,6 +313,37 @@ async def patch_active_page(book_id: int, request: Request) -> dict:
         )
     row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
     return _book_row_to_dict(row)
+
+
+@router.delete("/api/books/{book_id}", status_code=204)
+def delete_book(book_id: int, request: Request) -> None:
+    conn = request.app.state.conn
+    data_root: Path = request.app.state.data_root
+    row = conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Book not found")
+
+    with hold(request.app.state.db_lock):
+        conn.execute("DELETE FROM mark WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM audio_file WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM book_stats WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM narrator_book WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM reading_session WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM work_session WHERE book_id = ?", (book_id,))
+        conn.execute(
+            "UPDATE schedule_item SET resolved_book_id = NULL"
+            " WHERE resolved_book_id = ?",
+            (book_id,),
+        )
+        conn.execute("DELETE FROM book WHERE id = ?", (book_id,))
+
+    book_dir = data_root / "books" / row["slug"]
+    if book_dir.is_dir():
+        shutil.rmtree(book_dir, ignore_errors=True)
+
+    from studio_app.audio_scanner import recompute_stats
+    with hold(request.app.state.db_lock):
+        recompute_stats(conn)
 
 
 @router.post("/api/books/{book_id}/rescan_audio")

@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+from gdown.exceptions import FileURLRetrievalError
+
 from studio_app.source_fetch import download_source, extract_drive_id
 
 
@@ -39,14 +41,16 @@ def test_download_http_pdf(mock_get):
         path.unlink(missing_ok=True)
 
 
+@patch("studio_app.source_fetch._download_drive_requests")
 @patch("studio_app.source_fetch.gdown.download")
-def test_download_drive_pdf(mock_gdown, tmp_path: Path):
+def test_download_drive_pdf(mock_gdown, mock_requests, tmp_path: Path):
+    mock_gdown.side_effect = FileURLRetrievalError("blocked")
     out_file = tmp_path / "book.pdf"
     out_file.write_bytes(b"%PDF-1.4")
-    mock_gdown.return_value = str(out_file)
+    mock_requests.return_value = out_file
 
     path = download_source(
         "https://drive.google.com/file/d/1abcDEFghiJKLmnopQRstuVWXyz/view"
     )
     assert path.suffix == ".pdf"
-    mock_gdown.assert_called_once()
+    mock_requests.assert_called_once()

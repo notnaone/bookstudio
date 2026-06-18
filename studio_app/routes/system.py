@@ -41,6 +41,26 @@ def restore_marks(request: Request) -> dict:
         return restore_marks_from_disk(conn, data_root)
 
 
+@router.post("/api/pick_folder")
+def pick_folder() -> dict:
+    """Open a native folder picker (local desktop app only)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError as exc:
+        raise HTTPException(501, "Folder picker not available") from exc
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        root.attributes("-topmost", True)
+    except tk.TclError:
+        pass
+    path = filedialog.askdirectory()
+    root.destroy()
+    return {"path": path or None}
+
+
 @router.post("/api/snapshot")
 def trigger_snapshot(request: Request) -> dict:
     snapshot_job = getattr(request.app.state, "snapshot_job", None)

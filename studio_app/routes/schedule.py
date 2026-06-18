@@ -7,11 +7,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from gdown.exceptions import FileURLRetrievalError
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from studio_app.db_lock import hold
 from studio_app.ingest import ingest_book
+from studio_app.calendar_titles import effective_event_title, is_generic_title
 from studio_app.schedule_resolve import resolve_narrator_from_title
+from studio_app.schedule_dates import VALID_RANGES, range_bounds
 from studio_app.source_fetch import download_source
 
 router = APIRouter()
@@ -26,6 +29,22 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _schedule_display_title(row) -> str:
+    narr = row["resolved_narrator_name"]
+    book = row["resolved_book_title"]
+    if narr and book:
+        return f"{narr} - {book}"
+    if narr:
+        return narr
+    raw = (row["raw_title"] or "").strip()
+    if raw and not is_generic_title(raw):
+        return raw
+    derived = effective_event_title(raw, row["notes"])
+    if derived and not is_generic_title(derived):
+        return derived
+    return raw or "—"
+
+
 def _row_to_dict(row) -> dict:
     return {
         "id": row["id"],
@@ -34,6 +53,7 @@ def _row_to_dict(row) -> dict:
         "start_time": row["start_time"],
         "end_time": row["end_time"],
         "raw_title": row["raw_title"],
+        "display_title": _schedule_display_title(row),
         "notes": row["notes"],
         "resolved_narrator_id": row["resolved_narrator_id"],
         "resolved_book_id": row["resolved_book_id"],
@@ -75,20 +95,38 @@ def list_schedule(
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
     source: str | None = None,
+    range_: str | None = Query(None, alias="range"),
+    exclude_cancelled: bool = True,
 ) -> dict:
     conn = request.app.state.conn
+    if range_ is not None:
+        if range_ not in VALID_RANGES:
+            raise HTTPException(
+                400,
+                f"range must be one of: {', '.join(sorted(VALID_RANGES))}",
+            )
+    elif from_ is None and to is None:
+        range_ = "upcoming"
+
+    if range_ and range_ != "all":
+        range_from, range_to = range_bounds(range_)
+        from_ = from_ or range_from
+        to = to or range_to
+
     sql = f"{_select_sql()} WHERE 1=1"
     params: list[object] = []
     if from_ is not None:
         sql += " AND si.start_time >= ?"
         params.append(from_)
     if to is not None:
-        sql += " AND si.start_time <= ?"
+        sql += " AND si.start_time < ?"
         params.append(to)
     if source is not None:
         _require_enum(source, VALID_SOURCES, "source")
         sql += " AND si.source = ?"
         params.append(source)
+    if exclude_cancelled:
+        sql += " AND si.action_status != 'cancelled'"
     sql += " ORDER BY si.start_time"
     rows = conn.execute(sql, params).fetchall()
     return {"items": [_row_to_dict(r) for r in rows]}
@@ -443,6 +481,15 @@ async def jit_onboard(
             tmp_path = download_source(url)
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except FileURLRetrievalError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Google Drive download failed. Set the file to "
+                    "'Anyone with the link', or upload the file directly "
+                    "instead of using a Drive URL."
+                ),
+            ) from exc
         except requests.HTTPError as exc:
             raise HTTPException(
                 status_code=400, detail=f"Download failed: {exc}"

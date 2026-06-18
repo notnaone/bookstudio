@@ -1,18 +1,30 @@
 <!doctype html>
-<html><head>
+<html lang="en"><head>
 <meta charset="utf-8">
-<title>Book — Studio App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book — BookStudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css">
 </head><body>
-<header>
-  <strong>Studio App</strong>
-  <a href="/library">← Library</a>
-</header>
-<main>
-  <h1 id="title">Loading…</h1>
-  <p class="muted" id="meta"></p>
-  <p><button id="open-viewer" type="button" class="primary">Open in viewer</button></p>
-  <div id="draft-banner" class="muted" style="display:none; padding:10px; border:1px solid var(--border); border-radius:6px; margin-bottom:12px;">
+<div class="lv-app">
+  <aside class="lv-sidebar" id="lv-sidebar"></aside>
+  <div class="lv-main">
+    <header class="lv-header">
+      <div class="lv-header-main">
+        <a class="lv-back" href="/library">← Library</a>
+        <h1 id="title">Loading…</h1>
+        <p class="lv-subtitle" id="meta"></p>
+      </div>
+      <div class="lv-header-actions">
+        <button id="open-viewer" type="button" class="primary">Open in viewer</button>
+        <button id="open-split" type="button">Open side-by-side…</button>
+        <button id="delete-book" type="button" class="danger">Delete book</button>
+      </div>
+    </header>
+    <div class="lv-content">
+  <div id="draft-banner" class="lv-banner" style="display:none">
     Incomplete draft profile. Set publisher and genre to clear this banner.
   </div>
 
@@ -40,15 +52,26 @@
       </select>
     </div>
     <div class="field"><label>Narrator</label>
-      <select id="f-narrator"><option value="">Unassigned</option></select>
+      <div class="row">
+        <select id="f-narrator" style="flex:1"><option value="">Unassigned</option></select>
+        <button type="button" id="add-narrator-btn" title="Add narrator">+</button>
+      </div>
     </div>
     <div class="field"><label>Publisher</label>
-      <select id="f-publisher"><option value="">None</option></select>
+      <div class="row">
+        <select id="f-publisher" style="flex:1"><option value="">None</option></select>
+        <button type="button" id="add-publisher-btn" title="Add publisher">+</button>
+      </div>
     </div>
     <div class="field"><label>Genre</label><input id="f-genre"></div>
     <div class="field"><label>Planned end</label><input id="f-planned-end" type="date"></div>
     <div class="field"><label>Publisher notes</label><textarea id="f-notes" rows="3"></textarea></div>
-    <div class="field"><label>Audio folder</label><input id="f-audio"></div>
+    <div class="field"><label>Audio folder</label>
+      <div class="row">
+        <input id="f-audio" style="flex:1">
+        <button type="button" id="browse-audio">Browse…</button>
+      </div>
+    </div>
     <div><button class="primary" type="submit">Save</button>
       <span id="save-status" class="muted"></span>
       <button id="clear-draft" type="button" style="margin-left:12px; display:none">Confirm setup (clear draft)</button>
@@ -56,7 +79,48 @@
   </form>
 
   <p class="muted">Source path: <span id="source_path"></span></p>
-</main>
+    </div>
+  </div>
+</div>
+
+<dialog id="add-narrator-dialog">
+  <form method="dialog" id="add-narrator-form" class="col">
+    <h3>Add narrator</h3>
+    <div class="field"><label>Name</label><input id="new-narrator-name" required></div>
+    <div class="field"><label>Calendar alias</label><input id="new-narrator-alias" placeholder="optional"></div>
+    <div class="row">
+      <button type="submit" class="primary">Add</button>
+      <button type="button" id="cancel-narrator">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="add-publisher-dialog">
+  <form method="dialog" id="add-publisher-form" class="col">
+    <h3>Add publisher</h3>
+    <div class="field"><label>Name</label><input id="new-publisher-name" required></div>
+    <div class="field"><label>Notes</label><input id="new-publisher-notes" placeholder="optional"></div>
+    <div class="row">
+      <button type="submit" class="primary">Add</button>
+      <button type="button" id="cancel-publisher">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="split-dialog">
+  <form method="dialog" id="split-form" class="col">
+    <h3>Open side-by-side</h3>
+    <p class="muted">Pick a second book to open next to this one in Live view.</p>
+    <div class="field"><label>Second book</label>
+      <select id="split-book-id" required></select>
+    </div>
+    <div class="row">
+      <button type="submit" class="primary">Open</button>
+      <button type="button" id="cancel-split">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="/static/app.js"></script>
-<script>setupBookPage();</script>
+<script>renderSidebar('library'); setupBookPage();</script>
 </body></html>

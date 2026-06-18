@@ -1,17 +1,24 @@
 <!doctype html>
-<html><head>
+<html lang="en"><head>
 <meta charset="utf-8">
-<title>Settings — Studio App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — BookStudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css">
 </head><body>
-<header>
-  <strong>Studio App</strong>
-  <a href="/library">Library</a>
-  <a href="/schedule">Schedule</a>
-  <a class="active" href="/settings">Settings</a>
-</header>
-<main>
-  <h1>Settings</h1>
+<div class="lv-app">
+  <aside class="lv-sidebar" id="lv-sidebar"></aside>
+  <div class="lv-main">
+    <header class="lv-header">
+      <div class="lv-header-main">
+        <h1>Settings</h1>
+        <p class="lv-subtitle">Data paths, calendars, intervals, and maintenance.</p>
+      </div>
+      <div class="lv-avatar">MK</div>
+    </header>
+    <div class="lv-content">
 
   <section class="col">
     <h2>Data &amp; paths</h2>
@@ -73,8 +80,8 @@
   <section class="col">
     <h2>Maintenance</h2>
     <div class="row">
-      <button type="button" id="snapshot-now">Snapshot now</button>
-      <span id="snapshot-status" class="muted"></span>
+      <button type="button" id="maint-snapshot-now">Snapshot now</button>
+      <span id="maint-snapshot-status" class="muted"></span>
     </div>
     <div class="row">
       <label for="cleanup-days">Delete exports older than</label>
@@ -98,7 +105,11 @@
       <a class="button" href="/api/export/audio_files.csv">Download audio_files.csv</a>
     </div>
   </section>
-</main>
+
+    </div>
+  </div>
+</div>
 <script src="/static/app.js"></script>
 <script src="/static/settings.js"></script>
+<script>renderSidebar('settings');</script>
 </body></html>

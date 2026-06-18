@@ -248,3 +248,32 @@ async def test_patch_active_page_rejects_invalid(client, tmp_path: Path):
         f"/api/books/{bid}/active_page", json={"tracked_progress_page": 0}
     )
     assert r.status_code == 400
+
+
+async def test_delete_book_removes_from_library(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path, title="Delete Me")
+    r = await client.delete(f"/api/books/{bid}")
+    assert r.status_code == 204
+    r2 = await client.get(f"/api/books/{bid}")
+    assert r2.status_code == 404
+    r3 = await client.get("/api/books")
+    assert r3.json()["books"] == []
+
+
+async def test_delete_book_404(client):
+    r = await client.delete("/api/books/9999")
+    assert r.status_code == 404
+
+
+async def test_search_book_content_finds_text(client, tmp_path: Path):
+    bid = await _create_test_book(client, tmp_path, title="Searchable")
+    r = await client.get(f"/api/books/{bid}/search", params={"q": "paragraph"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] >= 1
+    assert len(body["matches"]) >= 1
+    first = body["matches"][0]
+    assert first["page"] >= 1
+    assert first["global_index"] == 0
+    assert first["index_on_page"] == 0
+    assert "paragraph" in first["snippet"].lower()

@@ -1,26 +1,45 @@
 <!doctype html>
-<html><head>
+<html lang="en"><head>
 <meta charset="utf-8">
-<title>Schedule — Studio App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule — BookStudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css">
 <link rel="stylesheet" href="/static/schedule.css">
 </head><body>
-<header>
-  <strong>Studio App</strong>
-  <a href="/library">Library</a>
-  <a class="active" href="/schedule">Schedule</a>
-  <a href="/settings">Settings</a>
-</header>
-<main>
-  <div class="schedule-toolbar row">
-    <h1>Schedule</h1>
-    <div class="row">
-      <button type="button" id="view-list" class="active">List</button>
-      <button type="button" id="view-lanes">Lanes</button>
-      <button type="button" id="refresh-calendars">Refresh calendars</button>
-    </div>
-  </div>
-  <p id="schedule-status" class="muted"></p>
+<div class="lv-app">
+  <aside class="lv-sidebar" id="lv-sidebar"></aside>
+  <div class="lv-main">
+    <header class="lv-header">
+      <div class="lv-header-main">
+        <h1>Schedule</h1>
+        <p id="schedule-status" class="lv-subtitle"></p>
+      </div>
+      <div class="lv-header-actions">
+        <button type="button" id="refresh-calendars">Refresh calendars</button>
+        <div class="lv-avatar">MK</div>
+      </div>
+    </header>
+
+    <div class="lv-content">
+      <div class="lv-toolbar">
+        <span class="filter-label muted">Show</span>
+        <button type="button" class="range-btn" data-range="today">Today</button>
+        <button type="button" class="range-btn" data-range="week">This week</button>
+        <button type="button" class="range-btn active" data-range="upcoming">Upcoming</button>
+        <button type="button" class="range-btn" data-range="month">This month</button>
+        <button type="button" class="range-btn" data-range="all">All</button>
+        <label class="cancelled-toggle muted">
+          <input type="checkbox" id="show-cancelled"> Show cancelled
+        </label>
+        <div class="lv-spacer"></div>
+        <div class="lv-seg">
+          <button type="button" id="view-list" class="active">List</button>
+          <button type="button" id="view-lanes">Lanes</button>
+        </div>
+      </div>
 
   <section id="list-view" class="schedule-view active">
     <table id="schedule-table">
@@ -56,7 +75,9 @@
       </div>
     </form>
   </section>
-</main>
+    </div>
+  </div>
+</div>
 
 <div id="modal-backdrop" class="modal-backdrop hidden">
   <div class="modal" id="detail-modal">
@@ -99,12 +120,19 @@
       <div class="field">
         <label>Source file or URL</label>
         <input id="jit-file" type="file" accept=".pdf,.epub,.docx,.txt">
-        <input id="jit-url" placeholder="Or Google Drive / file URL">
+        <input id="jit-url" placeholder="Public Google Drive or direct file URL">
+        <p class="muted" style="margin:4px 0 0;font-size:0.85rem">
+          Drive links must be shared as &quot;Anyone with the link&quot;, or upload the file above.
+        </p>
       </div>
       <div class="field">
         <label>Audio folder (optional)</label>
-        <input id="jit-audio">
+        <div class="row">
+          <input id="jit-audio" style="flex:1">
+          <button type="button" id="jit-browse-audio">Browse…</button>
+        </div>
       </div>
+      <p id="jit-status" class="muted"></p>
       <div class="row">
         <button class="primary" type="submit">Launch live session</button>
         <button type="button" id="jit-cancel">Cancel</button>
@@ -113,5 +141,7 @@
   </div>
 </div>
 
+<script src="/static/app.js"></script>
 <script src="/static/schedule.js"></script>
+<script>renderSidebar('schedule');</script>
 </body></html>
