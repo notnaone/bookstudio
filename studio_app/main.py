@@ -110,12 +110,8 @@ def build_app(
     def narrator_page(nid: int) -> FileResponse:
         return FileResponse(STATIC_DIR / "narrator.html")
 
-    @app.get("/live/{book_id}", include_in_schema=False)
-    def live_single(book_id: int) -> FileResponse:
-        return FileResponse(STATIC_DIR / "live.html")
-
-    @app.get("/live/{a}/{b}", include_in_schema=False)
-    def live_split(a: int, b: int) -> FileResponse:
+    @app.get("/live/{book_ids:path}", include_in_schema=False)
+    def live_page(book_ids: str) -> FileResponse:
         return FileResponse(STATIC_DIR / "live.html")
 
     @app.get("/schedule", include_in_schema=False)

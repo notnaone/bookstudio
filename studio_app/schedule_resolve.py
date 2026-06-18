@@ -11,24 +11,50 @@ def _utc_now() -> str:
 
 
 def parse_calendar_title(raw_title: str) -> tuple[str | None, str | None]:
-    """Split titles like 'Chris - Book Title' into narrator and book parts."""
-    if " - " not in raw_title:
+    """Split 'Narrator - Book' or return a single narrator-only title."""
+    title = (raw_title or "").strip()
+    if not title:
         return None, None
-    left, right = raw_title.split(" - ", 1)
-    narrator_part = left.strip() or None
-    book_part = right.strip() or None
-    return narrator_part, book_part
+    if " - " in title:
+        left, right = title.split(" - ", 1)
+        narrator_part = left.strip() or None
+        book_part = right.strip() or None
+        return narrator_part, book_part
+    return title, None
 
 
 def resolve_narrator_from_title(conn: sqlite3.Connection, raw_title: str) -> int | None:
-    """Match narrator by calendar_alias prefix (longest alias wins)."""
+    """Match narrator by calendar_alias prefix or by name."""
     narrator_id = _match_narrator_alias(conn, raw_title)
     if narrator_id is not None:
         return narrator_id
     narrator_part, _ = parse_calendar_title(raw_title)
     if narrator_part:
+        narrator_id = _match_narrator_name(conn, narrator_part)
+        if narrator_id is not None:
+            return narrator_id
         return _match_narrator_alias(conn, narrator_part)
     return None
+
+
+def _match_narrator_name(conn: sqlite3.Connection, text: str) -> int | None:
+    text = text.strip()
+    if not text:
+        return None
+    row = conn.execute(
+        "SELECT id FROM narrator WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1",
+        (text,),
+    ).fetchone()
+    if row:
+        return int(row["id"])
+    row = conn.execute(
+        "SELECT id FROM narrator"
+        " WHERE LOWER(?) LIKE LOWER(TRIM(name)) || '%'"
+        " ORDER BY LENGTH(name) DESC"
+        " LIMIT 1",
+        (text,),
+    ).fetchone()
+    return int(row["id"]) if row else None
 
 
 def _match_narrator_alias(conn: sqlite3.Connection, text: str) -> int | None:

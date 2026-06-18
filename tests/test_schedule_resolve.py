@@ -14,7 +14,8 @@ def test_parse_calendar_title_splits_narrator_and_book():
         "Christina",
         "Bar - Part 2",
     )
-    assert parse_calendar_title("Studio booking") == (None, None)
+    assert parse_calendar_title("Toomas") == ("Toomas", None)
+    assert parse_calendar_title("Studio booking") == ("Studio booking", None)
 
 
 def test_resolve_narrator_from_title_uses_alias_prefix(conn):
@@ -23,6 +24,17 @@ def test_resolve_narrator_from_title_uses_alias_prefix(conn):
     )
     assert resolve_narrator_from_title(conn, "Chris - Foo") == 1
     assert resolve_narrator_from_title(conn, "Studio booking") is None
+
+
+def test_resolve_narrator_from_title_matches_name_only(conn):
+    conn.execute(
+        "INSERT INTO narrator (name, calendar_alias) VALUES ('Toomas', NULL)"
+    )
+    assert resolve_narrator_from_title(conn, "Toomas") == 1
+    conn.execute(
+        "INSERT INTO narrator (name, calendar_alias) VALUES ('Ingrid', NULL)"
+    )
+    assert resolve_narrator_from_title(conn, "Ingrid") == 2
 
 
 def test_resolve_narrator_longest_alias_wins(conn):

@@ -1,6 +1,25 @@
 header {
   padding: 12px 16px;
   border-bottom: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#add-pane-btn {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+dialog {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
 }
 
 #panes {
@@ -46,42 +65,100 @@ header {
 }
 
 .marks-rail {
-  list-style: none;
-  margin: 0;
-  padding: 8px;
-  width: 180px;
-  border-right: 1px solid #eee;
-  overflow-y: auto;
+  display: none;
+}
+
+mark.search-hit {
+  background: #ffe066;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+mark.search-hit-active {
+  background: #ff9632;
+  box-shadow: 0 0 0 2px #e86c00;
+}
+
+.search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 10em;
+  max-width: 22em;
+}
+
+.search-wrap .search-input {
+  flex: 1;
+  min-width: 6em;
   font-size: 13px;
+  padding: 4px 8px;
 }
 
-.marks-rail li {
-  padding: 4px 0;
+.search-meta button {
+  font-size: 12px;
+  padding: 2px 6px;
+  min-width: 1.6em;
+}
+
+.search-toggle-count {
+  min-width: 4.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-dropdown {
+  width: 100%;
+  max-height: 140px;
+  overflow-y: auto;
+  border-bottom: 1px solid #eee;
+  background: #fafafa;
+  font-size: 12px;
+}
+
+.search-dropdown.hidden {
+  display: none;
+}
+
+.search-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  background: transparent;
   cursor: pointer;
-  border-radius: 3px;
+  font-size: 12px;
 }
 
-.marks-rail li:hover {
-  background: #f5f5f5;
-}
-
-.marks-rail li.flash {
+.search-dropdown button:hover,
+.search-dropdown button.active {
   background: #e8f5ef;
 }
 
-.marks-rail .muted {
-  color: #888;
-  cursor: default;
+.search-dropdown .snippet {
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.mark-swatch {
+.search-dropdown .meta {
+  color: #888;
+  font-size: 11px;
+}
+
+.zoom-nav button {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.zoom-label {
+  font-size: 12px;
+  min-width: 3em;
+  text-align: center;
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  margin-right: 4px;
-  vertical-align: middle;
-  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .viewer-host {
@@ -90,6 +167,52 @@ header {
   position: relative;
   overflow: auto;
   background: #fafafa;
+}
+
+.viewer-host iframe.page-frame {
+  transform-origin: top center;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+.pdf-page-wrap {
+  position: relative;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.pdf-highlight-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.pdf-highlight-layer .search-hit,
+.pdf-highlight-layer .search-hit-active {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.pdf-highlight-layer .search-hit {
+  background: rgba(255, 224, 102, 0.45);
+}
+
+.pdf-highlight-layer .search-hit-active {
+  background: rgba(255, 150, 50, 0.55);
+  box-shadow: 0 0 0 1.5px rgba(232, 108, 0, 0.85);
+  z-index: 2;
+}
+
+.top-bar .search-dropdown {
+  flex-basis: 100%;
+  order: 10;
 }
 
 .viewer-host.highlighter-active {

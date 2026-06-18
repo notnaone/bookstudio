@@ -90,12 +90,43 @@ async def test_list_schedule_filters_by_source_and_date_range(client):
             "from": "2026-06-20T00:00:00+00:00",
             "to": "2026-06-30T00:00:00+00:00",
             "source": "manual",
+            "range": "all",
+            "exclude_cancelled": "false",
         },
     )
     assert r.status_code == 200
     items = r.json()["items"]
     assert len(items) == 1
     assert items[0]["raw_title"] == "Late manual"
+
+
+async def test_list_schedule_defaults_to_upcoming_and_hides_cancelled(client, conn):
+    await _create_manual(
+        client,
+        start_time="2026-06-20T09:00:00+00:00",
+        end_time="2026-06-20T11:00:00+00:00",
+        raw_title="Upcoming manual",
+    )
+    conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, google_event_id, start_time, end_time, raw_title, action_status)"
+        " VALUES ('studio_1', 'old-1', '2024-01-01T10:00:00+00:00',"
+        " '2024-01-01T12:00:00+00:00', 'Old session', 'pending')"
+    )
+    conn.execute(
+        "INSERT INTO schedule_item"
+        " (source, google_event_id, start_time, end_time, raw_title, action_status)"
+        " VALUES ('studio_1', 'cancel-1', '2026-06-21T10:00:00+00:00',"
+        " '2026-06-21T12:00:00+00:00', 'Cancelled session', 'cancelled')"
+    )
+    r = await client.get("/api/schedule")
+    titles = [i["raw_title"] for i in r.json()["items"]]
+    assert "Upcoming manual" in titles
+    assert "Old session" not in titles
+    assert "Cancelled session" not in titles
+
+    r2 = await client.get("/api/schedule", params={"range": "all", "exclude_cancelled": "false"})
+    assert len(r2.json()["items"]) >= 3
 
 
 async def test_patch_manual_row_and_resolved_fields(client, conn):

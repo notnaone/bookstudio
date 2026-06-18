@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from studio_app.ics_client import CalendarEvent, parse_ics
+from studio_app.calendar_titles import effective_event_title
+from studio_app.schedule_dates import event_is_too_old, prune_cutoff
 from studio_app.schedule_resolve import auto_resolve_schedule_item
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,10 @@ def sync_calendar_source(
     now = _utc_now()
 
     for event in events:
+        if event_is_too_old(event.dtend):
+            continue
         seen_uids.add(event.uid)
+        title = effective_event_title(event.summary, event.description)
         start_time = _dt_iso(event.dtstart)
         end_time = _dt_iso(event.dtend)
         existing = conn.execute(
@@ -52,12 +57,12 @@ def sync_calendar_source(
                     event.uid,
                     start_time,
                     end_time,
-                    event.summary,
+                    title,
                     event.description,
                     now,
                 ),
             )
-            auto_resolve_schedule_item(conn, int(cur.lastrowid), event.summary)
+            auto_resolve_schedule_item(conn, int(cur.lastrowid), title)
         else:
             conn.execute(
                 "UPDATE schedule_item"
@@ -67,13 +72,13 @@ def sync_calendar_source(
                 (
                     start_time,
                     end_time,
-                    event.summary,
+                    title,
                     event.description,
                     now,
                     existing["id"],
                 ),
             )
-            auto_resolve_schedule_item(conn, int(existing["id"]), event.summary)
+            auto_resolve_schedule_item(conn, int(existing["id"]), title)
 
     if seen_uids:
         placeholders = ", ".join("?" * len(seen_uids))
@@ -110,6 +115,39 @@ def poll_calendars(
         ics_bytes = fetch_fn(url)
         events = parse_ics(ics_bytes)
         sync(conn, source, events)
+    _repair_titles_and_resolve(conn)
+    _prune_old_calendar_rows(conn)
+
+
+def _prune_old_calendar_rows(conn: sqlite3.Connection, *, keep_days_past: int = 7) -> int:
+    """Remove stale mirrored rows that ended more than keep_days_past ago."""
+    cutoff = prune_cutoff(keep_days_past=keep_days_past).isoformat(timespec="seconds")
+    cur = conn.execute(
+        "DELETE FROM schedule_item"
+        " WHERE google_event_id IS NOT NULL"
+        " AND end_time < ?"
+        " AND action_status IN ('pending', 'cancelled')",
+        (cutoff,),
+    )
+    if cur.rowcount:
+        logger.info("Pruned %s old calendar schedule row(s)", cur.rowcount)
+    return cur.rowcount
+
+
+def _repair_titles_and_resolve(conn: sqlite3.Connection) -> None:
+    """Re-derive titles from notes and re-resolve narrator/book links."""
+    rows = conn.execute(
+        "SELECT id, raw_title, notes FROM schedule_item"
+        " WHERE google_event_id IS NOT NULL"
+    ).fetchall()
+    for row in rows:
+        title = effective_event_title(row["raw_title"], row["notes"])
+        if title != row["raw_title"]:
+            conn.execute(
+                "UPDATE schedule_item SET raw_title = ? WHERE id = ?",
+                (title, row["id"]),
+            )
+        auto_resolve_schedule_item(conn, int(row["id"]), title)
 
 
 class CalendarPoller:

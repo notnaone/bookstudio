@@ -10,11 +10,17 @@ from urllib.parse import parse_qs, urlparse
 import gdown
 import requests
 
+try:
+    from gdown.exceptions import FileURLRetrievalError
+except ImportError:  # pragma: no cover - older gdown
+    FileURLRetrievalError = RuntimeError
+
 SUPPORTED_EXTS = {".txt", ".docx", ".epub", ".pdf"}
 _DRIVE_HOSTS = {"drive.google.com", "docs.google.com"}
 _DRIVE_ID_RE = re.compile(
     r"/(?:file/d|document/d|presentation/d|spreadsheets/d)/([\w-]{20,})"
 )
+_DRIVE_EXPORT_URL = "https://docs.google.com/uc?export=download"
 
 
 def extract_drive_id(url: str) -> str | None:
@@ -42,6 +48,60 @@ def download_source(url: str) -> Path:
     return _download_http(url)
 
 
+def _drive_confirm_token(response: requests.Response) -> str | None:
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):
+            return value
+    match = re.search(r"confirm=([0-9A-Za-z_]+)", response.text[:2048])
+    return match.group(1) if match else None
+
+
+def _filename_from_response(response: requests.Response, fallback: str) -> str:
+    disposition = response.headers.get("Content-Disposition", "")
+    match = re.search(r'filename\*?=(?:UTF-8\'\')?"?([^";\n]+)"?', disposition)
+    if match:
+        return match.group(1).strip()
+    return fallback
+
+
+def _validate_downloaded_path(path: Path) -> Path:
+    if path.suffix.lower() not in SUPPORTED_EXTS:
+        raise ValueError(
+            f"Downloaded file type {path.suffix!r} is not supported. "
+            f"Use one of: {', '.join(sorted(SUPPORTED_EXTS))}"
+        )
+    if path.stat().st_size == 0:
+        raise RuntimeError("Downloaded file is empty.")
+    return path
+
+
+def _download_drive_requests(file_id: str) -> Path:
+    session = requests.Session()
+    response = session.get(
+        _DRIVE_EXPORT_URL,
+        params={"id": file_id},
+        stream=True,
+        timeout=120,
+    )
+    token = _drive_confirm_token(response)
+    if token:
+        response = session.get(
+            _DRIVE_EXPORT_URL,
+            params={"id": file_id, "confirm": token},
+            stream=True,
+            timeout=120,
+        )
+    response.raise_for_status()
+    filename = _filename_from_response(response, f"drive-{file_id}")
+    suffix = Path(filename).suffix.lower() or ".bin"
+    tmp = Path(tempfile.gettempdir()) / f"studio_app_drive{suffix}"
+    with tmp.open("wb") as handle:
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                handle.write(chunk)
+    return _validate_downloaded_path(tmp)
+
+
 def _download_drive(file_id: str) -> Path:
     out_dir = Path(tempfile.gettempdir()) / "studio_app_drive"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -50,18 +110,32 @@ def _download_drive(file_id: str) -> Path:
             path.unlink()
         except OSError:
             pass
-    result = gdown.download(id=file_id, output=str(out_dir) + "/", quiet=True)
-    if not result:
+
+    drive_url = f"https://drive.google.com/uc?id={file_id}"
+    try:
+        result = gdown.download(
+            url=drive_url,
+            output=str(out_dir) + "/",
+            quiet=True,
+            fuzzy=True,
+        )
+        if result:
+            return _validate_downloaded_path(Path(result))
+    except FileURLRetrievalError:
+        pass
+
+    try:
+        return _download_drive_requests(file_id)
+    except requests.HTTPError as exc:
         raise RuntimeError(
-            "Google Drive download failed. Set sharing to 'Anyone with the link'."
-        )
-    path = Path(result)
-    if path.suffix.lower() not in SUPPORTED_EXTS:
-        raise ValueError(
-            f"Downloaded file type {path.suffix!r} is not supported. "
-            f"Use one of: {', '.join(sorted(SUPPORTED_EXTS))}"
-        )
-    return path
+            "Google Drive download failed. Share the file as "
+            "'Anyone with the link' or upload the file directly instead of a URL."
+        ) from exc
+    except (ValueError, OSError) as exc:
+        raise RuntimeError(
+            "Google Drive download failed. Share the file as "
+            "'Anyone with the link' or upload the file directly instead of a URL."
+        ) from exc
 
 
 def _download_http(url: str) -> Path:
@@ -78,4 +152,4 @@ def _download_http(url: str) -> Path:
         with tmp.open("wb") as handle:
             for chunk in response.iter_content(chunk_size=64 * 1024):
                 handle.write(chunk)
-    return tmp
+    return _validate_downloaded_path(tmp)

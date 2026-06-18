@@ -84,8 +84,8 @@ async function setupSettingsPage() {
     }
   });
 
-  const snapStatus = document.getElementById('snapshot-status');
-  document.getElementById('snapshot-now').addEventListener('click', async () => {
+  const snapStatus = document.getElementById('maint-snapshot-status');
+  document.getElementById('maint-snapshot-now').addEventListener('click', async () => {
     snapStatus.textContent = 'Snapshotting…';
     try {
       const r = await jsonFetch('/api/snapshot', { method: 'POST' });

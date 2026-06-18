@@ -1,8 +1,29 @@
 async function jsonFetch(url, opts = {}) {
   const r = await fetch(url, opts);
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  if (!r.ok) {
+    const text = await r.text();
+    let detail = text;
+    try {
+      const body = JSON.parse(text);
+      detail = body.detail || text;
+    } catch (_) { /* plain text */ }
+    throw new Error(detail);
+  }
   if (r.status === 204) return null;
   return r.json();
+}
+
+async function pickFolder() {
+  try {
+    const { path } = await jsonFetch('/api/pick_folder', { method: 'POST' });
+    return path || null;
+  } catch (_) {
+    const manual = prompt(
+      'Could not open folder picker. Paste the full folder path:',
+      '',
+    );
+    return manual ? manual.trim() : null;
+  }
 }
 
 function escapeHtml(s) {
@@ -33,15 +54,27 @@ function isToday(iso) {
 let scheduleItems = [];
 let activeItem = null;
 let jitItemId = null;
+let activeRange = 'upcoming';
+
+function scheduleQuery() {
+  const params = new URLSearchParams();
+  params.set('range', activeRange);
+  if (document.getElementById('show-cancelled').checked) {
+    params.set('exclude_cancelled', 'false');
+  }
+  return `/api/schedule?${params}`;
+}
 
 async function loadSchedule() {
   const status = document.getElementById('schedule-status');
   try {
-    const { items } = await jsonFetch('/api/schedule');
+    const { items } = await jsonFetch(scheduleQuery());
     scheduleItems = items;
     renderList();
     renderLanes();
-    status.textContent = `${items.length} item(s) loaded.`;
+    const rangeLabel = document.querySelector(`.range-btn[data-range="${activeRange}"]`)?.textContent
+      || activeRange;
+    status.textContent = `${items.length} item(s) · ${rangeLabel}`;
   } catch (e) {
     status.textContent = e.message;
   }
@@ -58,7 +91,7 @@ function renderList() {
       <td>${escapeHtml(formatWhen(item.start_time))}</td>
       <td>${escapeHtml(item.source)}</td>
       <td>${escapeHtml(item.kind || '—')}</td>
-      <td>${escapeHtml(item.raw_title)}</td>
+      <td>${escapeHtml(item.display_title || item.raw_title)}</td>
       <td>${escapeHtml(item.resolved_narrator_name || '—')}</td>
       <td>${escapeHtml(item.resolved_book_title || '—')}</td>
       <td>${escapeHtml(item.action_status)}</td>
@@ -90,7 +123,7 @@ function renderLanes() {
     host.innerHTML = items.map((item) => `
       <div class="lane-item source-${item.source}${isToday(item.start_time) ? ' today' : ''}"
            data-id="${item.id}">
-        <strong>${escapeHtml(item.raw_title)}</strong>
+        <strong>${escapeHtml(item.display_title || item.raw_title)}</strong>
         <div class="muted">${escapeHtml(formatWhen(item.start_time))}</div>
         <button type="button" data-start="${item.id}">Start Session</button>
       </div>`).join('');
@@ -112,7 +145,7 @@ function renderLanes() {
 function openItemModal(item) {
   if (!item) return;
   activeItem = item;
-  document.getElementById('modal-title').textContent = item.raw_title;
+  document.getElementById('modal-title').textContent = item.display_title || item.raw_title;
   const mirror = item.google_event_id != null;
   document.getElementById('modal-body').innerHTML = `
     <p><strong>Source:</strong> ${escapeHtml(item.source)}</p>
@@ -191,6 +224,7 @@ function showBookPicker(itemId, books) {
 async function openJitWizard(itemId, rawTitle) {
   jitItemId = itemId;
   document.getElementById('jit-event-title').textContent = rawTitle || '';
+  document.getElementById('jit-status').textContent = '';
   const { narrator_part: narrPart, book_part: bookPart } = parseCalendarTitle(rawTitle || '');
   document.getElementById('jit-title').value = bookPart || rawTitle || '';
   const { narrators } = await jsonFetch('/api/narrators');
@@ -217,6 +251,8 @@ function parseCalendarTitle(rawTitle) {
 
 async function submitJitForm(e) {
   e.preventDefault();
+  const status = document.getElementById('jit-status');
+  status.textContent = 'Launching…';
   const form = new FormData();
   const narratorSel = document.getElementById('jit-narrator');
   if (narratorSel.value) {
@@ -234,17 +270,35 @@ async function submitJitForm(e) {
   if (audio) form.append('audio_folder', audio);
   const file = document.getElementById('jit-file').files[0];
   const url = document.getElementById('jit-url').value.trim();
-  if (!file && !url) return;
+  if (!file && !url) {
+    status.textContent = 'Choose a source file or enter a URL.';
+    return;
+  }
   if (file) form.append('file', file);
   if (url) form.append('source_url', url);
-  const result = await jsonFetch(`/api/schedule/${jitItemId}/jit`, {
-    method: 'POST',
-    body: form,
-  });
-  location.href = `/live/${result.book_id}?session_id=${result.session_id}`;
+  try {
+    const result = await jsonFetch(`/api/schedule/${jitItemId}/jit`, {
+      method: 'POST',
+      body: form,
+    });
+    location.href = `/live/${result.book_id}?session_id=${result.session_id}`;
+  } catch (err) {
+    status.textContent = err.message;
+  }
 }
 
 function setupSchedulePage() {
+  document.querySelectorAll('.range-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeRange = btn.dataset.range;
+      document.querySelectorAll('.range-btn').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      loadSchedule();
+    });
+  });
+  document.getElementById('show-cancelled').addEventListener('change', () => loadSchedule());
+
   document.getElementById('view-list').addEventListener('click', () => {
     document.getElementById('view-list').classList.add('active');
     document.getElementById('view-lanes').classList.remove('active');
@@ -300,10 +354,10 @@ function setupSchedulePage() {
   document.getElementById('jit-cancel').addEventListener('click', () => {
     document.getElementById('jit-backdrop').classList.add('hidden');
   });
-  document.getElementById('jit-form').addEventListener('submit', async (e) => {
-    try { await submitJitForm(e); } catch (err) {
-      document.getElementById('schedule-status').textContent = err.message;
-    }
+  document.getElementById('jit-form').addEventListener('submit', submitJitForm);
+  document.getElementById('jit-browse-audio').addEventListener('click', async () => {
+    const path = await pickFolder();
+    if (path) document.getElementById('jit-audio').value = path;
   });
   document.getElementById('jit-narrator').addEventListener('change', (e) => {
     document.getElementById('jit-new-narrator-wrap').classList.toggle('hidden', e.target.value !== '');

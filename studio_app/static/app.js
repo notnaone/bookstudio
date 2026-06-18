@@ -1,7 +1,31 @@
 async function jsonFetch(url, opts = {}) {
   const r = await fetch(url, opts);
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  if (r.status === 204) return null;
   return r.json();
+}
+
+async function pickFolder() {
+  try {
+    const { path } = await jsonFetch('/api/pick_folder', { method: 'POST' });
+    return path || null;
+  } catch (e) {
+    const manual = prompt(
+      'Could not open folder picker. Paste the full folder path:',
+      '',
+    );
+    return manual ? manual.trim() : null;
+  }
+}
+
+function wireFolderBrowse(buttonId, inputId) {
+  const btn = document.getElementById(buttonId);
+  const input = document.getElementById(inputId);
+  if (!btn || !input) return;
+  btn.addEventListener('click', async () => {
+    const path = await pickFolder();
+    if (path) input.value = path;
+  });
 }
 
 async function setupSetupForm() {
@@ -45,19 +69,89 @@ async function setupSetupForm() {
   });
 }
 
-async function setupLibraryPage() {
-  document.querySelectorAll('.tabs button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const target = btn.dataset.tab;
-      document.querySelectorAll('.tab-panel').forEach(p => {
-        p.classList.toggle('active', p.dataset.tab === target);
-      });
+const LV_ICONS = {
+  library: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
+  schedule: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
+  narrators: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+  settings: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="6" x2="14" y2="6"></line><line x1="10" y1="6" x2="3" y2="6"></line><line x1="21" y1="12" x2="12" y2="12"></line><line x1="8" y1="12" x2="3" y2="12"></line><line x1="21" y1="18" x2="16" y2="18"></line><line x1="12" y1="18" x2="3" y2="18"></line><circle cx="12" cy="6" r="2"></circle><circle cx="6" cy="12" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>',
+  brand: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
+};
+
+function renderSidebar(active) {
+  const host = document.getElementById('lv-sidebar');
+  if (!host) return;
+  const items = [
+    { key: 'library', label: 'Library', href: '/library' },
+    { key: 'schedule', label: 'Schedule', href: '/schedule' },
+    { key: 'narrators', label: 'Narrators', href: '/library?tab=narrators', tab: 'narrators' },
+    { key: 'settings', label: 'Settings', href: '/settings' },
+  ];
+  host.innerHTML = `
+    <div class="lv-brand">
+      <div class="lv-brand-mark">${LV_ICONS.brand}</div>
+      <span class="lv-brand-name">BookStudio</span>
+    </div>
+    <div class="lv-nav-label">Studio</div>
+    ${items.map(it => `
+      <a class="lv-nav${it.key === active ? ' active' : ''}" href="${it.href}"${it.tab ? ` data-nav-tab="${it.tab}"` : ''}>
+        ${LV_ICONS[it.key]}
+        ${it.label}
+      </a>`).join('')}
+    <div class="lv-snapshot-card">
+      <div class="lv-snapshot-row">
+        <span id="snapshot-dot" class="lv-snapshot-dot"></span>
+        <span id="snapshot-status">Snapshot · —</span>
+      </div>
+      <button type="button" id="snapshot-now" class="lv-snapshot-btn">Snapshot now</button>
+    </div>`;
+
+  host.querySelectorAll('[data-nav-tab]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const tab = link.dataset.navTab;
+      if (document.querySelector(`.lv-tab[data-tab="${tab}"]`)) {
+        e.preventDefault();
+        activateLibraryTab(tab);
+      }
     });
   });
 
-  await Promise.all([refreshBooks(), refreshNarrators(), refreshPublishers()]);
+  setupSnapshotIndicator();
+}
+
+const libraryCounts = { books: 0, narrators: 0, publishers: 0 };
+
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function renderLibraryStats() {
+  const el = document.getElementById('library-stats');
+  if (!el) return;
+  el.textContent = [
+    plural(libraryCounts.books, 'book'),
+    plural(libraryCounts.narrators, 'narrator'),
+    plural(libraryCounts.publishers, 'publisher'),
+  ].join(' · ');
+}
+
+function activateLibraryTab(target) {
+  document.querySelectorAll('.lv-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === target);
+  });
+  document.querySelectorAll('.lv-panel').forEach(p => {
+    p.classList.toggle('active', p.dataset.tab === target);
+  });
+}
+
+async function setupLibraryPage() {
+  renderSidebar('library');
+  document.querySelectorAll('.lv-tab').forEach(btn => {
+    btn.addEventListener('click', () => activateLibraryTab(btn.dataset.tab));
+  });
+
+  await Promise.all([refreshNarrators(), refreshPublishers()]);
+  await refreshBooks();
+  setupAddBookDialog();
   document.getElementById('upload-form').addEventListener('submit', onUploadBook);
   document.getElementById('upload-url-btn').addEventListener('click', onUploadBookUrl);
   document.getElementById('filter-q').addEventListener('input', refreshBooks);
@@ -66,7 +160,23 @@ async function setupLibraryPage() {
   document.getElementById('filter-publisher').addEventListener('change', refreshBooks);
   document.getElementById('narrator-create').addEventListener('submit', onCreateNarrator);
   document.getElementById('publisher-create').addEventListener('submit', onCreatePublisher);
-  setupSnapshotIndicator();
+
+  const wantedTab = new URLSearchParams(location.search).get('tab');
+  if (wantedTab && document.querySelector(`.lv-tab[data-tab="${wantedTab}"]`)) {
+    activateLibraryTab(wantedTab);
+  }
+}
+
+function setupAddBookDialog() {
+  const dialog = document.getElementById('add-book-dialog');
+  const openBtn = document.getElementById('add-book-btn');
+  const cancelBtn = document.getElementById('add-book-cancel');
+  if (!dialog || !openBtn) return;
+  openBtn.addEventListener('click', () => {
+    document.getElementById('upload-status').textContent = '';
+    dialog.showModal();
+  });
+  if (cancelBtn) cancelBtn.addEventListener('click', () => dialog.close());
 }
 
 function formatSnapshotAge(iso) {
@@ -87,16 +197,23 @@ function snapshotStatusClass(iso) {
   return 'stale';
 }
 
-async function refreshSnapshotIndicator() {
+function setSnapshotUi(at, hadError) {
   const el = document.getElementById('snapshot-status');
-  if (!el) return;
+  const dot = document.getElementById('snapshot-dot');
+  if (el) el.textContent = hadError ? 'Snapshot · —' : `Snapshot · ${formatSnapshotAge(at)}`;
+  if (dot) {
+    const cls = hadError ? 'stale' : snapshotStatusClass(at);
+    dot.className = 'lv-snapshot-dot' + (cls === 'ok' ? '' : ` ${cls}`);
+  }
+}
+
+async function refreshSnapshotIndicator() {
+  if (!document.getElementById('snapshot-status')) return;
   try {
     const hb = await jsonFetch('/api/heartbeat');
-    const at = hb.last_snapshot_at;
-    el.textContent = `Last snapshot: ${formatSnapshotAge(at)}`;
-    el.className = `muted snapshot-status ${snapshotStatusClass(at)}`;
+    setSnapshotUi(hb.last_snapshot_at, false);
   } catch (_) {
-    el.textContent = 'Last snapshot: —';
+    setSnapshotUi(null, true);
   }
 }
 
@@ -119,6 +236,20 @@ function setupSnapshotIndicator() {
   });
 }
 
+const STATUS_META = {
+  planned: { label: 'Planned', dot: '#a1a1aa', bar: '#d4d4d8' },
+  in_progress: { label: 'In progress', dot: 'var(--lv-accent)', bar: 'var(--lv-accent)' },
+  done: { label: 'Done', dot: '#16a34a', bar: '#16a34a' },
+  archived: { label: 'Archived', dot: '#d4d4d8', bar: '#d4d4d8' },
+};
+
+function bookProgress(b) {
+  if (b.pages && b.pages > 0) {
+    return Math.max(0, Math.min(100, Math.round((b.current_page / b.pages) * 100)));
+  }
+  return (b.status === 'done' || b.status === 'archived') ? 100 : 0;
+}
+
 async function refreshBooks() {
   const params = new URLSearchParams();
   const q = document.getElementById('filter-q').value.trim();
@@ -131,35 +262,60 @@ async function refreshBooks() {
   if (pid) params.set('publisher_id', pid);
   const url = '/api/books' + (params.toString() ? '?' + params : '');
   const { books } = await jsonFetch(url);
+  libraryCounts.books = books.length;
+  renderLibraryStats();
   const tbody = document.querySelector('#books-table tbody');
   if (!books.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="muted">No books match.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="lv-empty">No books match.</td></tr>';
     return;
   }
   const narratorMap = Object.fromEntries(
     [...document.getElementById('filter-narrator').options].map(o => [o.value, o.textContent])
   );
-  tbody.innerHTML = books.map(b => `
-    <tr onclick="location.href='/books/${b.id}'" style="cursor:pointer">
-      <td>${escapeHtml(b.title)}</td>
-      <td>${b.format}</td>
+  const publisherMap = Object.fromEntries(
+    [...document.getElementById('filter-publisher').options].map(o => [o.value, o.textContent])
+  );
+  tbody.innerHTML = books.map(b => {
+    const meta = STATUS_META[b.status] || { label: b.status, dot: '#a1a1aa', bar: '#d4d4d8' };
+    const pct = bookProgress(b);
+    return `
+    <tr class="lv-row" onclick="location.href='/books/${b.id}'">
+      <td class="lv-cell-title">${escapeHtml(b.title)}</td>
+      <td><span class="lv-badge">${escapeHtml(b.format || '—')}</span></td>
       <td>${b.narrator_id ? escapeHtml(narratorMap[String(b.narrator_id)] || '—') : '—'}</td>
-      <td>${b.status}</td>
-      <td>${b.pages || '—'}</td>
-    </tr>`).join('');
+      <td class="lv-cell-sub">${b.publisher_id ? escapeHtml(publisherMap[String(b.publisher_id)] || '—') : '—'}</td>
+      <td>
+        <span class="lv-status">
+          <span class="lv-status-dot" style="background:${meta.dot}"></span>
+          <span class="lv-status-label">${meta.label}</span>
+        </span>
+      </td>
+      <td class="lv-cell-num">${b.pages || '—'}</td>
+      <td>
+        <span class="lv-progress">
+          <span class="lv-progress-track">
+            <span class="lv-progress-fill" style="width:${pct}%;background:${meta.bar}"></span>
+          </span>
+          <span class="lv-progress-label">${pct}%</span>
+        </span>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 async function refreshNarrators() {
   const { narrators } = await jsonFetch('/api/narrators');
+  libraryCounts.narrators = narrators.length;
+  renderLibraryStats();
   const tbody = document.querySelector('#narrators-table tbody');
   tbody.innerHTML = narrators.length
     ? narrators.map(n => `
-      <tr onclick="location.href='/narrators/${n.id}'" style="cursor:pointer">
-        <td>${escapeHtml(n.name)}</td>
+      <tr class="lv-row" onclick="location.href='/narrators/${n.id}'">
+        <td class="lv-cell-title">${escapeHtml(n.name)}</td>
         <td>${escapeHtml(n.calendar_alias || '—')}</td>
-        <td>${escapeHtml(n.notes || '')}</td>
+        <td class="lv-cell-sub">${escapeHtml(n.notes || '')}</td>
       </tr>`).join('')
-    : '<tr><td colspan="3" class="muted">No narrators yet.</td></tr>';
+    : '<tr><td colspan="3" class="lv-empty">No narrators yet.</td></tr>';
   const sel = document.getElementById('filter-narrator');
   const current = sel.value;
   sel.innerHTML = '<option value="">Any narrator</option>' +
@@ -169,14 +325,16 @@ async function refreshNarrators() {
 
 async function refreshPublishers() {
   const { publishers } = await jsonFetch('/api/publishers');
+  libraryCounts.publishers = publishers.length;
+  renderLibraryStats();
   const tbody = document.querySelector('#publishers-table tbody');
   tbody.innerHTML = publishers.length
     ? publishers.map(p => `
       <tr>
-        <td>${escapeHtml(p.name)}</td>
-        <td>${escapeHtml(p.notes || '')}</td>
+        <td class="lv-cell-title">${escapeHtml(p.name)}</td>
+        <td class="lv-cell-sub">${escapeHtml(p.notes || '')}</td>
       </tr>`).join('')
-    : '<tr><td colspan="2" class="muted">No publishers yet.</td></tr>';
+    : '<tr><td colspan="2" class="lv-empty">No publishers yet.</td></tr>';
   const sel = document.getElementById('filter-publisher');
   const current = sel.value;
   sel.innerHTML = '<option value="">Any publisher</option>' +
@@ -199,9 +357,10 @@ async function onUploadBook(e) {
   try {
     const r = await fetch('/api/books', { method: 'POST', body: fd });
     if (!r.ok) throw new Error(await r.text());
+    const book = await r.json();
     status.textContent = 'Done.';
     document.getElementById('upload-form').reset();
-    await refreshBooks();
+    location.href = `/books/${book.id}`;
   } catch (e) { status.textContent = e.message; }
 }
 
@@ -215,14 +374,14 @@ async function onUploadBookUrl() {
   }
   status.textContent = 'Downloading…';
   try {
-    await jsonFetch('/api/books/from_url', {
+    const book = await jsonFetch('/api/books/from_url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, url }),
     });
     status.textContent = 'Done.';
     document.getElementById('upload-form').reset();
-    await refreshBooks();
+    location.href = `/books/${book.id}`;
   } catch (e) { status.textContent = e.message; }
 }
 
@@ -268,10 +427,11 @@ async function onCreatePublisher(e) {
 
 async function setupBookPage() {
   const id = location.pathname.split('/').pop();
-  const [b, narrators, publishers] = await Promise.all([
+  const [b, narrators, publishers, allBooks] = await Promise.all([
     jsonFetch(`/api/books/${id}`),
     jsonFetch('/api/narrators'),
     jsonFetch('/api/publishers'),
+    jsonFetch('/api/books'),
   ]);
 
   document.getElementById('title').textContent = b.title;
@@ -282,6 +442,39 @@ async function setupBookPage() {
     }
     location.href = `/live/${id}`;
   });
+
+  const splitDialog = document.getElementById('split-dialog');
+  const splitSelect = document.getElementById('split-book-id');
+  splitSelect.innerHTML = allBooks.books
+    .filter((book) => String(book.id) !== String(id))
+    .map((book) => `<option value="${book.id}">${escapeHtml(book.title)}</option>`)
+    .join('');
+  document.getElementById('open-split').addEventListener('click', () => {
+    if (!splitSelect.options.length) {
+      alert('No other books in the library yet.');
+      return;
+    }
+    splitDialog.showModal();
+  });
+  document.getElementById('cancel-split').addEventListener('click', () => splitDialog.close());
+  document.getElementById('split-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const otherId = splitSelect.value;
+    if (!otherId) return;
+    location.href = `/live/${id}/${otherId}`;
+  });
+
+  document.getElementById('delete-book').addEventListener('click', async () => {
+    if (!confirm(`Delete “${b.title}” from the library? This cannot be undone.`)) return;
+    try {
+      await jsonFetch(`/api/books/${id}`, { method: 'DELETE' });
+      location.href = '/library';
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  wireFolderBrowse('browse-audio', 'f-audio');
   document.getElementById('format').textContent = b.format;
   document.getElementById('pages').textContent = b.pages || '—';
   document.getElementById('body_chars').textContent = b.body_chars.toLocaleString();
@@ -320,14 +513,66 @@ async function setupBookPage() {
   document.getElementById('f-audio').value = b.audio_folder || '';
 
   const nsel = document.getElementById('f-narrator');
-  nsel.innerHTML = '<option value="">Unassigned</option>' +
-    narrators.narrators.map(n => `<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('');
-  nsel.value = b.narrator_id == null ? '' : String(b.narrator_id);
+  function fillNarratorSelect(selectedId) {
+    nsel.innerHTML = '<option value="">Unassigned</option>' +
+      narrators.narrators.map(n => `<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('');
+    nsel.value = selectedId == null ? '' : String(selectedId);
+  }
+  fillNarratorSelect(b.narrator_id);
 
   const psel = document.getElementById('f-publisher');
-  psel.innerHTML = '<option value="">None</option>' +
-    publishers.publishers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
-  psel.value = b.publisher_id == null ? '' : String(b.publisher_id);
+  function fillPublisherSelect(selectedId) {
+    psel.innerHTML = '<option value="">None</option>' +
+      publishers.publishers.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    psel.value = selectedId == null ? '' : String(selectedId);
+  }
+  fillPublisherSelect(b.publisher_id);
+
+  const narratorDialog = document.getElementById('add-narrator-dialog');
+  document.getElementById('add-narrator-btn').addEventListener('click', () => narratorDialog.showModal());
+  document.getElementById('cancel-narrator').addEventListener('click', () => narratorDialog.close());
+  document.getElementById('add-narrator-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const created = await jsonFetch('/api/narrators', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('new-narrator-name').value.trim(),
+          calendar_alias: document.getElementById('new-narrator-alias').value.trim() || null,
+        }),
+      });
+      narrators.narrators.push(created);
+      fillNarratorSelect(created.id);
+      narratorDialog.close();
+      document.getElementById('add-narrator-form').reset();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  const publisherDialog = document.getElementById('add-publisher-dialog');
+  document.getElementById('add-publisher-btn').addEventListener('click', () => publisherDialog.showModal());
+  document.getElementById('cancel-publisher').addEventListener('click', () => publisherDialog.close());
+  document.getElementById('add-publisher-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const created = await jsonFetch('/api/publishers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('new-publisher-name').value.trim(),
+          notes: document.getElementById('new-publisher-notes').value.trim() || null,
+        }),
+      });
+      publishers.publishers.push(created);
+      fillPublisherSelect(created.id);
+      publisherDialog.close();
+      document.getElementById('add-publisher-form').reset();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 
   if (b.is_draft) {
     document.getElementById('draft-banner').style.display = 'block';
