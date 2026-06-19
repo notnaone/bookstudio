@@ -315,6 +315,11 @@ class PdfAdapter {
     const flipY = [1, 0, 0, -1, 0, 0];
     let hitOnPage = 0;
     let activeEl = null;
+    // Reusable 2D context for prefix width measurement. We can't recover the
+    // embedded font name, but measureText with a sane fallback at the item's
+    // actual pixel font-size is far closer than (totalWidth / charCount), which
+    // assumes monospace and drifts on every proportional PDF.
+    const measureCtx = (this._measureCanvas ||= document.createElement('canvas')).getContext('2d');
 
     for (const item of this.textContentItems) {
       const str = item.str || '';
@@ -336,14 +341,35 @@ class PdfAdapter {
       const h = Math.abs(composed[3]) * (item.height / Math.abs(item.transform[3]));
 
       if (w <= 0 || h <= 0 || str.length === 0) continue;
-      const charW = w / str.length;
+
+      // Font size in screen pixels for this run.
+      const fontPx = Math.abs(composed[3]) || Math.abs(composed[0]) || h;
+      // Guess family from pdf.js's internal font name when possible — most
+      // book PDFs are serif, and the font name often contains "serif",
+      // "times", "roman", etc.
+      const fontHint = (item.fontName || '').toLowerCase();
+      const family = /(mono|courier|consol)/.test(fontHint)
+        ? 'monospace'
+        : /(sans|arial|helvet|verdana|tahoma|calibri|geneva)/.test(fontHint)
+          ? 'sans-serif'
+          : 'serif';
+      measureCtx.font = `${fontPx}px ${family}`;
+      // Calibrate against the run: pdf.js gives us the true total width (w);
+      // measureText on the same string yields the same total under our guessed
+      // font only by luck, so scale our prefix measurements by the ratio. This
+      // preserves correct end-anchoring even when the fallback font's metrics
+      // differ from the embedded font.
+      const measuredTotal = measureCtx.measureText(str).width;
+      const cal = measuredTotal > 0 ? w / measuredTotal : 1;
 
       let start = 0;
       let idx = lower.indexOf(q, start);
       while (idx !== -1) {
         const active = hitOnPage === activeOnPage;
-        const hlLeft = left + idx * charW;
-        const hlW = charW * q.length;
+        const prefixW = measureCtx.measureText(str.slice(0, idx)).width * cal;
+        const matchW = measureCtx.measureText(str.slice(idx, idx + q.length)).width * cal;
+        const hlLeft = left + prefixW;
+        const hlW = matchW;
 
         const span = document.createElement('span');
         span.className = active ? 'search-hit-active' : 'search-hit';
