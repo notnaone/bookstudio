@@ -85,6 +85,17 @@ def build_app(
     app.include_router(exports_routes.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+    @app.middleware("http")
+    async def _revalidate_static(request: Request, call_next):
+        # StaticFiles only sends Last-Modified/ETag, so browsers apply heuristic
+        # freshness and can keep serving a stale live.js/live.css after an edit
+        # without ever revalidating (the no-build-step trap). Force a conditional
+        # request every time; unchanged files still return a cheap 304.
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.get("/", include_in_schema=False)
     def root(request: Request) -> RedirectResponse:
         row = request.app.state.conn.execute(
