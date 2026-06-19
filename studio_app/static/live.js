@@ -29,6 +29,15 @@ const SEARCH_HIT_STYLE = 'background-color:#ffe066;color:inherit;padding:0 2px;b
 const SEARCH_ACTIVE_STYLE =
   'background-color:#ff9632;color:inherit;padding:0 2px;border-radius:2px;box-shadow:0 0 0 2px #e86c00';
 
+// PDF marks sit over the rendered canvas glyphs (which carry the visible text),
+// so keep their fill translucent and the text transparent — an opaque fill would
+// hide the very word it is meant to highlight.
+const PDF_SEARCH_HIT_STYLE =
+  'background-color:rgba(255,224,102,0.5);color:transparent;border-radius:2px';
+const PDF_SEARCH_ACTIVE_STYLE =
+  'background-color:rgba(255,150,50,0.55);color:transparent;border-radius:2px;'
+  + 'box-shadow:0 0 0 1.5px rgba(232,108,0,0.85)';
+
 function countPdfMatchesInItems(items, query) {
   const q = query.toLowerCase();
   const matches = [];
@@ -65,7 +74,7 @@ function clearSearchHighlights(root) {
   if (root.normalize) root.normalize();
 }
 
-function highlightText(root, query) {
+function highlightText(root, query, hitStyle = SEARCH_HIT_STYLE) {
   clearSearchHighlights(root);
   if (!query || query.length < 2 || !root) return 0;
   ensureSearchStyles(root.ownerDocument);
@@ -94,7 +103,7 @@ function highlightText(root, query) {
       if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
       const mark = document.createElement('mark');
       mark.className = 'search-hit';
-      mark.style.cssText = SEARCH_HIT_STYLE;
+      mark.style.cssText = hitStyle;
       mark.textContent = text.slice(idx, idx + query.length);
       frag.appendChild(mark);
       hitCount += 1;
@@ -107,13 +116,18 @@ function highlightText(root, query) {
   return hitCount;
 }
 
-function setActiveSearchHit(root, indexOnPage) {
+function setActiveSearchHit(
+  root,
+  indexOnPage,
+  hitStyle = SEARCH_HIT_STYLE,
+  activeStyle = SEARCH_ACTIVE_STYLE,
+) {
   if (!root) return;
   const hits = root.querySelectorAll('mark.search-hit');
   hits.forEach((el, i) => {
     const active = i === indexOnPage;
     el.classList.toggle('search-hit-active', active);
-    el.style.cssText = active ? SEARCH_ACTIVE_STYLE : SEARCH_HIT_STYLE;
+    el.style.cssText = active ? activeStyle : hitStyle;
   });
   hits[indexOnPage]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
@@ -247,15 +261,18 @@ class PdfAdapter {
     this.container = null;
     this.pdf = null;
     this.canvas = null;
+    this.wrap = null;
     this.currentPage = 1;
     this._renderTask = null;
+    this._textTask = null;
     this.zoomLevel = 1;
     this.baseScale = 1.25;
     this.lastSearchQuery = '';
     this.activeMatch = null;
-    this.highlightDiv = null;
+    this.textLayerDiv = null;
     this.textContentItems = [];
     this.currentViewport = null;
+    this._resizeObserver = null;
   }
 
   async init(container, book) {
@@ -263,20 +280,29 @@ class PdfAdapter {
     this.book = book;
     this.currentPage = Math.max(1, book.current_page || 1);
     container.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.className = 'pdf-page-wrap';
+    this.wrap = document.createElement('div');
+    this.wrap.className = 'pdf-page-wrap';
     this.canvas = document.createElement('canvas');
-    this.canvas.className = 'page-frame';
-    this.highlightDiv = document.createElement('div');
-    this.highlightDiv.className = 'pdf-highlight-layer';
-    wrap.appendChild(this.canvas);
-    wrap.appendChild(this.highlightDiv);
-    container.appendChild(wrap);
+    this.canvas.className = 'page-frame pdf-canvas';
+    // Transparent, selectable-style text layer produced by pdf.js. Its spans
+    // are positioned in the page's own coordinate space and then the whole
+    // layer is CSS-scaled to match the displayed canvas, so search highlights
+    // always sit on the matched glyphs regardless of zoom or window size.
+    this.textLayerDiv = document.createElement('div');
+    this.textLayerDiv.className = 'pdf-text-layer';
+    this.wrap.appendChild(this.canvas);
+    this.wrap.appendChild(this.textLayerDiv);
+    container.appendChild(this.wrap);
     const url = `/api/books/${book.id}/view/source`;
     this.pdf = await pdfjsLib.getDocument({
       url,
       standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/',
     }).promise;
+    // The canvas bitmap stays at the intrinsic viewport size while CSS scales it
+    // down to fit. The text layer must follow the *displayed* size, not the
+    // intrinsic one — recompute that ratio whenever the host is resized.
+    this._resizeObserver = new ResizeObserver(() => this._syncTextLayerScale());
+    this._resizeObserver.observe(container);
     await this.goToPage(this.currentPage);
   }
 
@@ -289,107 +315,76 @@ class PdfAdapter {
     this.currentViewport = viewport;
     this.canvas.height = viewport.height;
     this.canvas.width = viewport.width;
-    this.highlightDiv.style.width = `${viewport.width}px`;
-    this.highlightDiv.style.height = `${viewport.height}px`;
 
     if (this._renderTask) this._renderTask.cancel();
     this._renderTask = page.render({
       canvasContext: this.canvas.getContext('2d'),
       viewport,
     });
-    await this._renderTask.promise;
+    try {
+      await this._renderTask.promise;
+    } catch (_) {
+      return; // superseded by a newer render (RenderingCancelledException)
+    }
 
+    await this._renderTextLayer(page, viewport);
+    this._syncTextLayerScale();
+    this._applySearchToTextLayer();
+  }
+
+  async _renderTextLayer(page, viewport) {
+    this.textLayerDiv.innerHTML = '';
+    // pdf.js sizes the container and fonts from this CSS variable; it must equal
+    // viewport.scale or pdf.js logs an error and the layer collapses.
+    this.textLayerDiv.style.setProperty('--scale-factor', String(viewport.scale));
     const textContent = await page.getTextContent();
     this.textContentItems = textContent.items;
-    this._drawHighlights();
-  }
-
-  _drawHighlights() {
-    this.highlightDiv.innerHTML = '';
-    if (!this.lastSearchQuery || !this.textContentItems.length || !this.currentViewport) return;
-    const q = this.lastSearchQuery.toLowerCase();
-    const activeOnPage = this.activeMatch?.page === this.currentPage
-      ? this.activeMatch.index_on_page : -1;
-    const viewport = this.currentViewport;
-    // Flip matrix to convert from PDF Y-up to screen Y-down
-    const flipY = [1, 0, 0, -1, 0, 0];
-    let hitOnPage = 0;
-    let activeEl = null;
-    // Reusable 2D context for prefix width measurement. We can't recover the
-    // embedded font name, but measureText with a sane fallback at the item's
-    // actual pixel font-size is far closer than (totalWidth / charCount), which
-    // assumes monospace and drifts on every proportional PDF.
-    const measureCtx = (this._measureCanvas ||= document.createElement('canvas')).getContext('2d');
-
-    for (const item of this.textContentItems) {
-      const str = item.str || '';
-      if (!str) continue;
-      const lower = str.toLowerCase();
-      if (!lower.includes(q)) continue;
-
-      // Compose: viewport.transform × item.transform × flipY
-      const composed = pdfjsLib.Util.transform(
-        pdfjsLib.Util.transform(viewport.transform, item.transform),
-        flipY,
-      );
-      // composed[4],composed[5] = top-left corner in pixel coords
-      // composed[0] = effective horizontal scale, |composed[3]| = effective vertical scale
-      const left = composed[4];
-      const top = composed[5];
-      const scaleRatio = composed[0] / item.transform[0];
-      const w = item.width * scaleRatio;
-      const h = Math.abs(composed[3]) * (item.height / Math.abs(item.transform[3]));
-
-      if (w <= 0 || h <= 0 || str.length === 0) continue;
-
-      // Font size in screen pixels for this run.
-      const fontPx = Math.abs(composed[3]) || Math.abs(composed[0]) || h;
-      // Guess family from pdf.js's internal font name when possible — most
-      // book PDFs are serif, and the font name often contains "serif",
-      // "times", "roman", etc.
-      const fontHint = (item.fontName || '').toLowerCase();
-      const family = /(mono|courier|consol)/.test(fontHint)
-        ? 'monospace'
-        : /(sans|arial|helvet|verdana|tahoma|calibri|geneva)/.test(fontHint)
-          ? 'sans-serif'
-          : 'serif';
-      measureCtx.font = `${fontPx}px ${family}`;
-      // Calibrate against the run: pdf.js gives us the true total width (w);
-      // measureText on the same string yields the same total under our guessed
-      // font only by luck, so scale our prefix measurements by the ratio. This
-      // preserves correct end-anchoring even when the fallback font's metrics
-      // differ from the embedded font.
-      const measuredTotal = measureCtx.measureText(str).width;
-      const cal = measuredTotal > 0 ? w / measuredTotal : 1;
-
-      let start = 0;
-      let idx = lower.indexOf(q, start);
-      while (idx !== -1) {
-        const active = hitOnPage === activeOnPage;
-        const prefixW = measureCtx.measureText(str.slice(0, idx)).width * cal;
-        const matchW = measureCtx.measureText(str.slice(idx, idx + q.length)).width * cal;
-        const hlLeft = left + prefixW;
-        const hlW = matchW;
-
-        const span = document.createElement('span');
-        span.className = active ? 'search-hit-active' : 'search-hit';
-        span.style.left = `${hlLeft}px`;
-        span.style.top = `${top}px`;
-        span.style.width = `${Math.max(hlW, 2)}px`;
-        span.style.height = `${Math.max(h, 4)}px`;
-        this.highlightDiv.appendChild(span);
-        if (active) activeEl = span;
-
-        hitOnPage += 1;
-        start = idx + q.length;
-        idx = lower.indexOf(q, start);
-      }
+    if (this._textTask?.cancel) {
+      try { this._textTask.cancel(); } catch (_) { /* ignore */ }
     }
-    if (activeEl) activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    this._textTask = pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: this.textLayerDiv,
+      viewport,
+    });
+    try {
+      await this._textTask.promise;
+    } catch (_) {
+      /* cancelled by a newer page render */
+    }
   }
 
-  async renderTextHighlights() {
-    this._drawHighlights();
+  // Scale the intrinsic-sized text layer to the canvas's *displayed* size.
+  _syncTextLayerScale() {
+    if (!this.canvas || !this.textLayerDiv || !this.currentViewport) return;
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !this.currentViewport.width) return;
+    const ratio = rect.width / this.currentViewport.width;
+    this.textLayerDiv.style.transformOrigin = '0 0';
+    this.textLayerDiv.style.transform = `scale(${ratio})`;
+  }
+
+  _applySearchToTextLayer() {
+    if (!this.textLayerDiv) return;
+    clearSearchHighlights(this.textLayerDiv);
+    if (!this.lastSearchQuery) return;
+    highlightText(this.textLayerDiv, this.lastSearchQuery, PDF_SEARCH_HIT_STYLE);
+    if (this.activeMatch && this.activeMatch.page === this.currentPage) {
+      setActiveSearchHit(
+        this.textLayerDiv,
+        this.activeMatch.index_on_page,
+        PDF_SEARCH_HIT_STYLE,
+        PDF_SEARCH_ACTIVE_STYLE,
+      );
+    }
+  }
+
+  async applyPageHighlights() {
+    this._applySearchToTextLayer();
+  }
+
+  getOverlayContainer() {
+    return this.wrap;
   }
 
   getTotalPages() {
@@ -437,9 +432,7 @@ class PdfAdapter {
   clearSearch() {
     this.lastSearchQuery = '';
     this.activeMatch = null;
-    if (this.highlightDiv) this.highlightDiv.innerHTML = '';
-    this.textContentItems = [];
-    if (this.canvas) this.canvas.style.outline = '';
+    if (this.textLayerDiv) clearSearchHighlights(this.textLayerDiv);
   }
 }
 
@@ -1060,8 +1053,17 @@ class PaneController {
     }
   }
 
+  // Element that marks are positioned against. For PDFs this is the page wrap
+  // (same box as the canvas), so percentages describe a spot *on the page* and
+  // reproduce at any zoom level. Other adapters fall back to the viewer host,
+  // preserving their existing behaviour.
+  markContainer() {
+    return this.adapter.getOverlayContainer?.() || this.viewerHost;
+  }
+
   renderMarkOverlays() {
-    this.viewerHost.querySelectorAll('.mark-overlay').forEach((el) => el.remove());
+    const container = this.markContainer();
+    container.querySelectorAll('.mark-overlay').forEach((el) => el.remove());
     const page = this.adapter.getCurrentViewerPage();
     this.marks.filter((m) => m.page === page).forEach((m) => {
       const div = document.createElement('div');
@@ -1072,7 +1074,7 @@ class PaneController {
       div.style.height = `${m.h_pct}%`;
       div.style.background = m.color;
       div.title = m.comment || '';
-      this.viewerHost.appendChild(div);
+      container.appendChild(div);
     });
   }
 
@@ -1080,20 +1082,20 @@ class PaneController {
     if (!this.highlighterMode) return;
     if (e.button !== 0 || e.target.classList.contains('mark-overlay')) return;
     this.onFocus(this);
-    const rect = this.viewerHost.getBoundingClientRect();
+    const rect = this.markContainer().getBoundingClientRect();
     this.dragStart = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
     this.dragPreview = document.createElement('div');
     this.dragPreview.className = 'mark-drag-preview';
-    this.viewerHost.appendChild(this.dragPreview);
+    this.markContainer().appendChild(this.dragPreview);
     e.preventDefault();
   }
 
   onMarkDragMove(e) {
     if (!this.highlighterMode || !this.dragStart || !this.dragPreview) return;
-    const rect = this.viewerHost.getBoundingClientRect();
+    const rect = this.markContainer().getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const left = Math.min(this.dragStart.x, x);
@@ -1110,7 +1112,7 @@ class PaneController {
 
   async onMarkDragEnd(e) {
     if (!this.highlighterMode || !this.dragStart || !this.dragPreview) return;
-    const rect = this.viewerHost.getBoundingClientRect();
+    const rect = this.markContainer().getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const left = Math.min(this.dragStart.x, x);
