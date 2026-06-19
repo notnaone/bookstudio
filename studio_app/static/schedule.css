@@ -65,7 +65,7 @@
   background: var(--lv-bg);
   font-size: 13px;
 }
-.lane-item:hover { background: #fafafa; }
+.lane-item:hover { background: var(--lv-bg-hover); }
 .lane-item.today { border-color: var(--lv-accent); }
 .lane-item.source-studio_1 { border-left: 3px solid #5b8def; }
 .lane-item.source-studio_2 { border-left: 3px solid #8b5bef; }

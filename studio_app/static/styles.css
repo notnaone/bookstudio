@@ -3,18 +3,22 @@
    The immersive Live viewer keeps its own live.css. */
 
 :root {
-  --lv-accent: #18181b;
-  --lv-text: #18181b;
-  --lv-text-2: #3f3f46;
-  --lv-text-3: #52525b;
-  --lv-muted: #71717a;
-  --lv-faint: #a1a1aa;
+  --lv-accent: #c2570c;
+  --lv-accent-soft: #fdf3ec;
+  --lv-accent-soft-border: #f6dcc6;
+  --lv-accent-on-soft: #9a4509;
+  --lv-text: #1c1917;
+  --lv-text-2: #44403c;
+  --lv-text-3: #57534e;
+  --lv-muted: #78716c;
+  --lv-faint: #a8a29e;
   --lv-bg: #ffffff;
   --lv-bg-2: #fbfbfa;
-  --lv-bg-3: #f1f1f0;
-  --lv-border: #ededed;
-  --lv-border-2: #e4e4e7;
-  --lv-border-3: #f4f4f5;
+  --lv-bg-3: #f0efed;
+  --lv-bg-hover: #fafaf9;
+  --lv-border: #ececea;
+  --lv-border-2: #e7e5e4;
+  --lv-border-3: #f4f3f1;
   --lv-green: #16a34a;
   --lv-red: #dc2626;
   --lv-amber: #d97706;
@@ -60,7 +64,7 @@ a { color: var(--lv-accent); }
   width: 25px;
   height: 25px;
   border-radius: 7px;
-  background: var(--lv-accent);
+  background: var(--lv-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -297,7 +301,7 @@ textarea {
   resize: vertical;
 }
 input:focus, select:focus, textarea:focus, .lv-input:focus {
-  border-color: #c4c4c8;
+  border-color: var(--lv-accent);
 }
 select {
   appearance: none;
@@ -354,14 +358,14 @@ button, a.button {
   gap: 6px;
   text-decoration: none;
 }
-button:hover, a.button:hover { background: #fafafa; }
+button:hover, a.button:hover { background: var(--lv-bg-hover); }
 button.primary, .lv-btn-primary {
   border: none;
   background: var(--lv-accent);
   color: #ffffff;
   font-weight: 550;
 }
-button.primary:hover, .lv-btn-primary:hover { opacity: 0.9; background: var(--lv-accent); }
+button.primary:hover, .lv-btn-primary:hover { background: #a64909; }
 button.danger {
   border-color: #f1c6c6;
   background: #fef2f2;
@@ -381,7 +385,7 @@ button:disabled { opacity: 0.55; cursor: default; }
   cursor: pointer;
   font-family: inherit;
 }
-.lv-btn-ghost:hover { background: #fafafa; }
+.lv-btn-ghost:hover { background: var(--lv-bg-hover); }
 
 /* ── Tables ────────────────────────────────────────────── */
 table, .lv-table {
@@ -415,7 +419,7 @@ table tr > th:first-child {
   width: 180px;
 }
 tbody tr.lv-row { cursor: pointer; }
-tbody tr.lv-row:hover { background: #fafafa; }
+tbody tr.lv-row:hover { background: var(--lv-bg-hover); }
 
 .lv-cell-title { font-weight: 550; color: var(--lv-text); }
 .lv-cell-sub { color: var(--lv-text-3); }
