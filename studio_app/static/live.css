@@ -182,31 +182,36 @@ mark.search-hit-active {
   margin: 0 auto;
 }
 
-.pdf-highlight-layer {
+/* pdf.js text layer: transparent, positioned text runs over the canvas. The
+   layer is sized to the intrinsic viewport and CSS-scaled (transform) by
+   PdfAdapter to match the displayed canvas, so highlights stay glued to glyphs.
+   pointer-events are off so the highlighter drag and wheel paging reach the
+   canvas underneath. */
+.pdf-text-layer {
   position: absolute;
   left: 0;
   top: 0;
-  pointer-events: none;
+  transform-origin: 0 0;
+  overflow: hidden;
+  line-height: 1;
   z-index: 1;
-  overflow: visible;
+  pointer-events: none;
+  forced-color-adjust: none;
 }
 
-.pdf-highlight-layer .search-hit,
-.pdf-highlight-layer .search-hit-active {
+.pdf-text-layer span {
+  color: transparent;
   position: absolute;
-  display: block;
-  box-sizing: border-box;
-  pointer-events: none;
+  white-space: pre;
+  transform-origin: 0% 0%;
+}
+
+.pdf-text-layer mark.search-hit,
+.pdf-text-layer mark.search-hit-active {
   border-radius: 2px;
 }
 
-.pdf-highlight-layer .search-hit {
-  background: rgba(255, 224, 102, 0.45);
-}
-
-.pdf-highlight-layer .search-hit-active {
-  background: rgba(255, 150, 50, 0.55);
-  box-shadow: 0 0 0 1.5px rgba(232, 108, 0, 0.85);
+.pdf-text-layer mark.search-hit-active {
   z-index: 2;
 }
 
@@ -259,6 +264,16 @@ mark.search-hit-active {
   max-height: 100%;
   display: block;
   margin: 0 auto;
+}
+
+/* The PDF canvas already carries its real page proportions via its bitmap
+   width/height attributes. Forcing 8.5x11 (letter portrait) distorted
+   landscape and non-letter pages, which is exactly what overlays are aligned
+   against. Let it keep its intrinsic ratio and just fit the available width. */
+canvas.pdf-canvas {
+  aspect-ratio: auto;
+  height: auto;
+  max-height: none;
 }
 
 .pace-badge {
